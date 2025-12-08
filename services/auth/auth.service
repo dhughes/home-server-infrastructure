@@ -1,0 +1,14 @@
+[Unit]
+Description=Auth Service
+After=network.target
+
+[Service]
+Type=simple
+User=dhughes
+WorkingDirectory=/home/dhughes/infrastructure/services/auth
+ExecStart=/usr/bin/python3 /home/dhughes/infrastructure/services/auth/app.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

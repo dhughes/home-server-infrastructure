@@ -1,0 +1,19 @@
+doughughes.net, www.doughughes.net {
+	# Protected app - requires auth
+	handle /random-word* {
+		forward_auth localhost:8000 {
+			uri /verify
+		}
+		reverse_proxy localhost:8001
+	}
+
+	# Public app - no auth required
+	handle /lottery* {
+		reverse_proxy localhost:8002
+	}
+
+	# Auth service handles: /, /login, /logout, /account, /admin/*
+	handle {
+		reverse_proxy localhost:8000
+	}
+}

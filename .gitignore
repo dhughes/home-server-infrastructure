@@ -1,0 +1,10 @@
+# User data - don't commit credentials or sessions
+services/auth/users.json
+services/auth/sessions.json
+
+# Python
+__pycache__/
+*.pyc
+
+# Logs
+*.log
