@@ -2,8 +2,10 @@
 """
 Auth service for Caddy forward_auth.
 Handles login, logout, session management, and user administration.
+Dynamically loads apps from ~/apps/*/app.json
 """
 
+import glob
 import hashlib
 import json
 import os
@@ -17,6 +19,7 @@ from datetime import datetime, timedelta
 PORT = 8000
 DATA_FILE = os.path.join(os.path.dirname(__file__), "users.json")
 SESSIONS_FILE = os.path.join(os.path.dirname(__file__), "sessions.json")
+APPS_DIR = "/home/dhughes/apps"
 SESSION_DURATION_DAYS = 30
 
 # In-memory session store (loaded from file for persistence)
@@ -79,6 +82,23 @@ def delete_session(token):
         del sessions[token]
         save_sessions()
 
+def load_apps():
+    """Load all app configurations from ~/apps/*/app.json"""
+    apps = []
+    pattern = os.path.join(APPS_DIR, "*", "app.json")
+    for config_path in glob.glob(pattern):
+        try:
+            with open(config_path, 'r') as f:
+                app = json.load(f)
+                app['_config_path'] = config_path
+                app['_app_dir'] = os.path.dirname(config_path)
+                apps.append(app)
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"Warning: Could not load {config_path}: {e}")
+    # Sort by name
+    apps.sort(key=lambda a: a.get('name', ''))
+    return apps
+
 # Load data on startup
 load_sessions()
 
@@ -118,10 +138,51 @@ class AuthHandler(BaseHTTPRequestHandler):
         self.send_header('Location', location)
         self.end_headers()
 
+    def send_file(self, filepath, content_type):
+        """Serve a static file"""
+        try:
+            with open(filepath, 'rb') as f:
+                content = f.read()
+            self.send_response(200)
+            self.send_header('Content-Type', content_type)
+            self.send_header('Content-Length', len(content))
+            self.end_headers()
+            self.wfile.write(content)
+        except IOError:
+            self.send_response(404)
+            self.end_headers()
+
     def do_GET(self):
         path = urlparse(self.path).path
         user = self.get_current_user()
         users = load_users()
+
+        # Serve app images
+        if path.startswith('/app-image/'):
+            app_name = path[len('/app-image/'):]
+            # Find the app and serve its image
+            apps = load_apps()
+            for app in apps:
+                if os.path.basename(app['_app_dir']) == app_name:
+                    image = app.get('image')
+                    if image:
+                        image_path = os.path.join(app['_app_dir'], image)
+                        if os.path.exists(image_path):
+                            ext = os.path.splitext(image)[1].lower()
+                            content_types = {
+                                '.png': 'image/png',
+                                '.jpg': 'image/jpeg',
+                                '.jpeg': 'image/jpeg',
+                                '.gif': 'image/gif',
+                                '.svg': 'image/svg+xml',
+                                '.webp': 'image/webp'
+                            }
+                            content_type = content_types.get(ext, 'application/octet-stream')
+                            self.send_file(image_path, content_type)
+                            return
+            self.send_response(404)
+            self.end_headers()
+            return
 
         if path == '/verify':
             # Caddy forward_auth endpoint
@@ -252,21 +313,121 @@ class AuthHandler(BaseHTTPRequestHandler):
     def base_style(self):
         return """
         <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+            * { box-sizing: border-box; }
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                max-width: 900px;
+                margin: 0 auto;
+                padding: 20px;
+                background: #f5f5f5;
+            }
             h1 { color: #333; }
             a { color: #007bff; text-decoration: none; }
             a:hover { text-decoration: underline; }
             form { margin: 20px 0; }
-            input[type="text"], input[type="password"] { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
-            button, input[type="submit"] { padding: 10px 20px; background: #007bff; color: white; border: none; cursor: pointer; margin-top: 10px; }
+            input[type="text"], input[type="password"] {
+                padding: 10px;
+                margin: 5px 0;
+                width: 100%;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+            }
+            button, input[type="submit"] {
+                padding: 10px 20px;
+                background: #007bff;
+                color: white;
+                border: none;
+                cursor: pointer;
+                margin-top: 10px;
+                border-radius: 4px;
+            }
             button:hover, input[type="submit"]:hover { background: #0056b3; }
             .error { color: red; margin: 10px 0; }
             .success { color: green; margin: 10px 0; }
             ul { list-style: none; padding: 0; }
             li { padding: 10px 0; border-bottom: 1px solid #eee; }
             .user-row { display: flex; justify-content: space-between; align-items: center; }
-            nav { margin-bottom: 30px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+            nav {
+                margin-bottom: 30px;
+                padding: 15px;
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }
             nav a { margin-right: 15px; }
+
+            /* Card grid */
+            .app-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                gap: 20px;
+                margin-top: 20px;
+            }
+            .app-card {
+                background: white;
+                border-radius: 12px;
+                padding: 20px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                transition: transform 0.2s, box-shadow 0.2s;
+                text-decoration: none;
+                color: inherit;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }
+            .app-card:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+                text-decoration: none;
+            }
+            .app-card-image {
+                width: 256px;
+                height: 256px;
+                border-radius: 16px;
+                object-fit: cover;
+                margin-bottom: 16px;
+            }
+            .app-card-icon {
+                width: 256px;
+                height: 256px;
+                border-radius: 16px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 128px;
+                margin-bottom: 16px;
+                flex-shrink: 0;
+                overflow: hidden;
+            }
+            .app-card-name {
+                font-size: 18px;
+                font-weight: 600;
+                color: #333;
+                margin-bottom: 4px;
+            }
+            .app-card-description {
+                font-size: 14px;
+                color: #666;
+            }
+            .app-card-private {
+                opacity: 0.6;
+                pointer-events: none;
+            }
+            .app-card-private .app-card-name::after {
+                content: ' 🔒';
+                font-size: 14px;
+            }
+
+            /* Forms container */
+            .form-container {
+                background: white;
+                border-radius: 12px;
+                padding: 30px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                max-width: 400px;
+            }
         </style>
         """
 
@@ -285,25 +446,50 @@ class AuthHandler(BaseHTTPRequestHandler):
         return nav
 
     def index_page(self, user):
-        users = load_users()
-        is_admin = users.get(user, {}).get('role') == 'admin' if user else False
+        apps = load_apps()
+
+        cards_html = ""
+        for app in apps:
+            is_public = app.get('public', True)
+
+            # Skip private apps for non-logged-in users (don't show at all)
+            if not is_public and not user:
+                continue
+
+            name = app.get('name', 'Unnamed App')
+            path = app.get('path', '/')
+            description = app.get('description', '')
+            icon = app.get('icon', '📦')
+            image = app.get('image')
+            app_dir_name = os.path.basename(app['_app_dir'])
+
+            # Image or icon
+            if image:
+                image_html = f'<img src="/app-image/{app_dir_name}" class="app-card-image" alt="{name}">'
+            else:
+                image_html = f'<div class="app-card-icon">{icon}</div>'
+
+            cards_html += f'''
+            <a href="{path}" class="app-card">
+                {image_html}
+                <div class="app-card-name">{name}</div>
+                <div class="app-card-description">{description}</div>
+            </a>
+            '''
 
         html = f"""<!DOCTYPE html>
 <html>
-<head><title>doughughes.net</title>{self.base_style()}</head>
+<head>
+    <title>doughughes.net</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    {self.base_style()}
+</head>
 <body>
 {self.nav(user)}
 <h1>Apps</h1>
-<ul>
-<li><a href="/lottery">Lottery Numbers</a></li>
-"""
-        if user:
-            html += '<li><a href="/random-word">Random Word</a></li>'
-        else:
-            html += '<li>Random Word <em>(login required)</em></li>'
-
-        html += """
-</ul>
+<div class="app-grid">
+{cards_html}
+</div>
 </body>
 </html>"""
         return html
@@ -312,9 +498,14 @@ class AuthHandler(BaseHTTPRequestHandler):
         error_html = f'<p class="error">{error}</p>' if error else ''
         return f"""<!DOCTYPE html>
 <html>
-<head><title>Login - doughughes.net</title>{self.base_style()}</head>
+<head>
+    <title>Login - doughughes.net</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    {self.base_style()}
+</head>
 <body>
 {self.nav(None)}
+<div class="form-container">
 <h1>Login</h1>
 {error_html}
 <form method="POST" action="/login">
@@ -322,6 +513,7 @@ class AuthHandler(BaseHTTPRequestHandler):
     <input type="password" name="password" placeholder="Password" required>
     <input type="submit" value="Login">
 </form>
+</div>
 </body>
 </html>"""
 
@@ -330,9 +522,14 @@ class AuthHandler(BaseHTTPRequestHandler):
         success_html = f'<p class="success">{success}</p>' if success else ''
         return f"""<!DOCTYPE html>
 <html>
-<head><title>Account - doughughes.net</title>{self.base_style()}</head>
+<head>
+    <title>Account - doughughes.net</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    {self.base_style()}
+</head>
 <body>
 {self.nav(user)}
+<div class="form-container">
 <h1>Account Settings</h1>
 <p>Logged in as: <strong>{user}</strong></p>
 <h2>Change Password</h2>
@@ -343,6 +540,7 @@ class AuthHandler(BaseHTTPRequestHandler):
     <input type="password" name="confirm_password" placeholder="Confirm New Password" required>
     <input type="submit" value="Update Password">
 </form>
+</div>
 </body>
 </html>"""
 
@@ -364,9 +562,14 @@ class AuthHandler(BaseHTTPRequestHandler):
 
         return f"""<!DOCTYPE html>
 <html>
-<head><title>User Management - doughughes.net</title>{self.base_style()}</head>
+<head>
+    <title>User Management - doughughes.net</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    {self.base_style()}
+</head>
 <body>
 {self.nav('admin')}
+<div class="form-container" style="max-width: 600px;">
 <h1>User Management</h1>
 {error_html}{success_html}
 <h2>Current Users</h2>
@@ -375,12 +578,13 @@ class AuthHandler(BaseHTTPRequestHandler):
 <form method="POST" action="/admin/users/add">
     <input type="text" name="username" placeholder="Username" required>
     <input type="password" name="password" placeholder="Password" required>
-    <select name="role">
+    <select name="role" style="padding: 10px; width: 100%; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px;">
         <option value="user">User</option>
         <option value="admin">Admin</option>
     </select>
     <input type="submit" value="Add User">
 </form>
+</div>
 </body>
 </html>"""
 

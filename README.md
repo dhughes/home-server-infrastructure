@@ -9,10 +9,11 @@ This is a self-hosted web server running on commodity hardware (originally an In
 **Key decisions made:**
 - Ubuntu LTS as the OS
 - Cloudflare for DNS (free tier) - handles SSL termination option and provides DDNS API
-- Caddy as reverse proxy - automatic HTTPS, simple config
-- Custom auth service - session-based login, user management
+- Caddy as reverse proxy - automatic HTTPS, simple config, Caddyfile auto-generated from app configs
+- Custom auth service - session-based login, user management, dynamic app index
 - Systemd for service management
 - UFW for firewall
+- App configuration via `app.json` files - apps self-describe their routes, ports, and visibility
 
 ## Hardware Requirements
 
@@ -24,7 +25,7 @@ This is a self-hosted web server running on commodity hardware (originally an In
 
 1. Download Ubuntu Server or Desktop LTS
 2. Install with default options
-3. Create user `dhughes` (or your preferred username)
+3. Create user `dhughes` (or your preferred username - update paths in this guide accordingly)
 4. Enable SSH during install, or install after: `sudo apt install openssh-server`
 
 ## Step 2: Basic System Configuration
@@ -99,6 +100,8 @@ If behind double NAT, use IP passthrough/DMZ on the outer router.
 sudo apt install ddclient
 ```
 
+During install, select "other" for provider and enter placeholder values.
+
 Edit `/etc/ddclient.conf`:
 ```
 daemon=600
@@ -150,12 +153,6 @@ sudo apt update
 sudo apt install caddy
 ```
 
-Copy config:
-```bash
-sudo cp ~/infrastructure/caddy/Caddyfile /etc/caddy/Caddyfile
-sudo systemctl restart caddy
-```
-
 ## Step 7: Install Auth Service
 
 ```bash
@@ -165,7 +162,7 @@ sudo systemctl enable auth
 sudo systemctl start auth
 ```
 
-Default login: `admin` / `changeme` (change immediately!)
+Default login: `admin` / `changeme` (change immediately after first login!)
 
 ## Step 8: Configure Passwordless Deploy
 
@@ -174,13 +171,12 @@ echo 'dhughes ALL=(ALL) NOPASSWD: /home/dhughes/infrastructure/deploy.sh' | sudo
 sudo chmod 440 /etc/sudoers.d/infrastructure
 ```
 
-Test: `sudo ~/infrastructure/deploy.sh`
-
 ## Step 9: Clone and Install Apps
 
-For each app in `~/apps/`:
+For each app:
 
 ```bash
+mkdir -p ~/apps
 cd ~/apps
 git clone <app-repo-url> <app-name>
 cd <app-name>
@@ -195,13 +191,32 @@ sudo systemctl enable <app-name>
 sudo systemctl start <app-name>
 ```
 
-## Step 10: Verify Everything
+Each app should have:
+- **app.json** - Configuration file describing the app (see App Configuration below)
+- **<app-name>.service** - Systemd service file
+- App code and any images referenced in app.json
+
+## Step 10: Deploy Everything
+
+```bash
+cd ~/infrastructure
+sudo ./deploy.sh
+```
+
+This will:
+1. Read all `~/apps/*/app.json` files
+2. Generate Caddyfile with routes for all apps
+3. Copy Caddyfile to `/etc/caddy/` and restart Caddy
+4. Restart the auth service
+
+## Step 11: Verify Everything
 
 ```bash
 # Check services
 systemctl status caddy
 systemctl status auth
 systemctl status ddclient
+systemctl status <app-name>
 
 # Check firewall
 sudo ufw status
@@ -214,6 +229,36 @@ dig ssh.doughughes.net
 curl https://doughughes.net
 ssh dhughes@ssh.doughughes.net
 ```
+
+## App Configuration
+
+Each app in `~/apps/<app-name>/` needs an `app.json` file:
+
+```json
+{
+  "name": "My App",
+  "path": "/my-app",
+  "port": 8003,
+  "public": false,
+  "icon": "🚀",
+  "image": "logo.png",
+  "description": "Short description of the app"
+}
+```
+
+**Fields:**
+- `name` - Display name on the index page
+- `path` - URL path (e.g., `/my-app` → `https://doughughes.net/my-app`)
+- `port` - Local port the app listens on (use 8001+ to avoid conflicts)
+- `public` - `true` = visible to everyone, `false` = requires login
+- `icon` - Emoji fallback if no image is provided
+- `image` - Filename of image in app directory (e.g., `"logo.png"`), or `null` for icon-only
+- `description` - Short description shown on the app card
+
+**How it works:**
+- `generate-caddyfile.py` reads all app.json files and creates Caddy routes
+- The auth service reads app.json files to build the index page with app cards
+- Private apps (`"public": false`) require login to access and only appear on the index when logged in
 
 ## Architecture Decisions
 
@@ -231,10 +276,17 @@ ssh dhughes@ssh.doughughes.net
 - `forward_auth` for authentication
 - Alternative considered: Nginx (more complex config)
 
+### Why auto-generated Caddyfile?
+- Apps are self-describing via app.json
+- No need to manually edit Caddy config when adding apps
+- Single source of truth for app configuration
+- Deploy script regenerates Caddyfile from app.json files
+
 ### Why custom auth instead of Authelia?
 - Simpler for single-user/small setup
 - Full control over behavior
 - No Docker dependency
+- Serves the dynamic index page with app cards
 - Authelia is better for multi-app SSO at scale
 
 ### Why systemd services?
@@ -250,17 +302,43 @@ ssh dhughes@ssh.doughughes.net
 - Easy to add/remove rules
 - Built into Ubuntu
 
+## Directory Structure
+
+```
+~/infrastructure/           # This repo
+├── CLAUDE.md              # Documentation for Claude Code
+├── README.md              # This file (rebuild guide)
+├── deploy.sh              # Deployment script (passwordless sudo)
+├── generate-caddyfile.py  # Generates Caddyfile from app.json files
+├── caddy/
+│   └── Caddyfile          # Auto-generated, don't edit manually
+└── services/
+    └── auth/
+        ├── app.py         # Auth service + index page
+        ├── auth.service   # Systemd service file
+        ├── users.json     # User credentials (not in git)
+        └── sessions.json  # Active sessions (not in git)
+
+~/apps/                    # Separate git repo per app
+├── <app-name>/
+│   ├── app.json           # App configuration
+│   ├── <app-name>.service # Systemd service file
+│   ├── logo.png           # Optional app image
+│   └── ... (app code)
+```
+
 ## Backup Considerations
 
 **What to back up:**
-- `~/infrastructure/` (git repo)
-- `~/apps/*/` (git repos)
+- `~/infrastructure/` (git repo, push to remote)
+- `~/apps/*/` (git repos, push to remotes)
 - `~/infrastructure/services/auth/users.json` (user credentials - NOT in git)
 - `/etc/ddclient.conf` (contains API token)
 
 **What doesn't need backup:**
 - Session files (users just re-login)
 - SSL certificates (Caddy regenerates them)
+- Generated Caddyfile (regenerated from app.json on deploy)
 - System packages (reinstall from apt)
 
 ## Troubleshooting
@@ -285,4 +363,14 @@ ssh dhughes@ssh.doughughes.net
 ### Auth not working
 1. Check service: `systemctl status auth`
 2. Check logs: `journalctl -u auth -f`
-3. Verify Caddy config has `forward_auth` blocks
+3. Clear browser cookies and retry
+
+### App not showing on index page
+1. Verify `~/apps/<app>/app.json` exists and is valid JSON
+2. Redeploy: `sudo ~/infrastructure/deploy.sh`
+3. Check auth logs: `journalctl -u auth -f`
+
+### App not accessible via URL
+1. Check app service is running: `systemctl status <app-name>`
+2. Redeploy to regenerate Caddyfile: `sudo ~/infrastructure/deploy.sh`
+3. Check Caddy logs: `journalctl -u caddy -f`
