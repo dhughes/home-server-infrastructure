@@ -9,6 +9,7 @@ import glob
 import hashlib
 import json
 import os
+import re
 import secrets
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from http.cookies import SimpleCookie
@@ -82,19 +83,78 @@ def delete_session(token):
         del sessions[token]
         save_sessions()
 
+def parse_caddy_conf(config_path):
+    """
+    Parse a caddy.conf file to extract routing metadata.
+
+    Returns: dict with keys 'path', 'port', 'public'
+    Returns None if parsing fails.
+    """
+    try:
+        with open(config_path, 'r') as f:
+            content = f.read()
+
+        # Extract path from: handle /path* { or handle /path/* {
+        path_match = re.search(r'handle\s+(/[^\s{]*)', content)
+        if not path_match:
+            return None
+
+        path = path_match.group(1)
+        # Remove trailing * if present
+        path = re.sub(r'\*+$', '', path)
+
+        # Extract port from: reverse_proxy localhost:PORT
+        port_match = re.search(r'reverse_proxy\s+localhost:(\d+)', content)
+        if not port_match:
+            return None
+
+        port = int(port_match.group(1))
+
+        # Check if public (no auth)
+        # Look for 'forward_auth' directive
+        has_auth = bool(re.search(r'forward_auth', content))
+        is_public = not has_auth
+
+        return {
+            'path': path,
+            'port': port,
+            'public': is_public
+        }
+    except (IOError, ValueError) as e:
+        print(f"Warning: Could not parse {config_path}: {e}")
+        return None
+
 def load_apps():
-    """Load all app configurations from ~/apps/*/app.json"""
+    """Load all app configurations from ~/apps/*/app.json and ~/apps/*/caddy.conf"""
     apps = []
     pattern = os.path.join(APPS_DIR, "*", "app.json")
     for config_path in glob.glob(pattern):
         try:
+            # Load display data from app.json
             with open(config_path, 'r') as f:
                 app = json.load(f)
                 app['_config_path'] = config_path
                 app['_app_dir'] = os.path.dirname(config_path)
-                apps.append(app)
+
+            # Load routing data from caddy.conf
+            caddy_conf_path = os.path.join(app['_app_dir'], 'caddy.conf')
+            if os.path.exists(caddy_conf_path):
+                routing_data = parse_caddy_conf(caddy_conf_path)
+                if routing_data:
+                    app.update(routing_data)
+                else:
+                    print(f"Warning: Could not parse caddy.conf for {app.get('name', 'Unknown')}")
+                    continue
+            else:
+                # Backward compatibility: try to read from app.json
+                if 'path' not in app or 'port' not in app:
+                    print(f"Warning: No caddy.conf and incomplete app.json for {app['_app_dir']}")
+                    continue
+
+            apps.append(app)
         except (json.JSONDecodeError, IOError) as e:
             print(f"Warning: Could not load {config_path}: {e}")
+
     # Sort by name
     apps.sort(key=lambda a: a.get('name', ''))
     return apps

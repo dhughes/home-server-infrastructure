@@ -164,12 +164,25 @@ sudo systemctl start auth
 
 Default login: `admin` / `changeme` (change immediately after first login!)
 
-## Step 8: Configure Passwordless Deploy
+## Step 8: Configure Passwordless Sudo
+
+### Infrastructure Deploy Script
 
 ```bash
 echo 'dhughes ALL=(ALL) NOPASSWD: /home/dhughes/infrastructure/deploy.sh' | sudo tee /etc/sudoers.d/infrastructure
-sudo chmod 440 /etc/sudoers.d/infrastructure
+sudo chmod 0440 /etc/sudoers.d/infrastructure
 ```
+
+### App Service Restarts
+
+Allow passwordless restart/status for app services (needed for app deploy scripts):
+
+```bash
+echo "dhughes ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart home-inventory, /usr/bin/systemctl restart random-word, /usr/bin/systemctl restart lottery-numbers, /usr/bin/systemctl status home-inventory, /usr/bin/systemctl status random-word, /usr/bin/systemctl status lottery-numbers" | sudo tee /etc/sudoers.d/app-services
+sudo chmod 0440 /etc/sudoers.d/app-services
+```
+
+**Note:** Sudoers doesn't support wildcards in command arguments, so each service must be listed explicitly. When adding a new app, update this file with the new service name.
 
 ## Step 9: Clone and Install Apps
 

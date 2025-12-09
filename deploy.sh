@@ -15,8 +15,6 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 deploy_caddy() {
-    echo "Generating Caddyfile from app configs..."
-    python3 "$SCRIPT_DIR/generate-caddyfile.py"
     echo "Deploying Caddy config..."
     cp "$SCRIPT_DIR/caddy/Caddyfile" /etc/caddy/Caddyfile
     systemctl restart caddy

@@ -5,11 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-# Deploy everything (generates Caddyfile from app configs + restarts all services)
+# Deploy everything (caddy config + all services)
 sudo ./deploy.sh
 
 # Deploy specific components
-sudo ./deploy.sh caddy     # Regenerate Caddyfile and restart Caddy
+sudo ./deploy.sh caddy     # Deploy Caddy config only
 sudo ./deploy.sh auth      # Restart auth service only
 sudo ./deploy.sh services  # Restart all services (not Caddy)
 
@@ -23,8 +23,9 @@ sudo systemctl restart <service>         # Restart a single service
 
 | What Changed | What to Run |
 |--------------|-------------|
-| Added/removed an app | `sudo ./deploy.sh` (regenerates Caddyfile + restarts services) |
-| Changed an app's `app.json` (port, path, public/private) | `sudo ./deploy.sh caddy` |
+| Added/removed an app | `sudo ./deploy.sh` (restarts Caddy + services) |
+| Changed an app's `caddy.conf` (routing) | `sudo ./deploy.sh caddy` |
+| Changed app.json (display only) | `sudo ./deploy.sh auth` |
 | Changed auth service code | `sudo ./deploy.sh auth` |
 | Changed an app's code | `sudo systemctl restart <app-name>` |
 
@@ -37,14 +38,16 @@ Internet → Cloudflare (DNS/SSL) → Router → Caddy (reverse proxy) → Apps
 ```
 
 **This repo (`~/infrastructure/`):**
-- `caddy/Caddyfile` - Auto-generated from app.json files (don't edit manually)
-- `generate-caddyfile.py` - Reads ~/apps/*/app.json and generates Caddyfile
+- `caddy/Caddyfile` - Reverse proxy config with import directive
 - `services/auth/app.py` - Python auth service (port 8000), serves index page
 - `deploy.sh` - Deployment script (runs with passwordless sudo)
 
-**Apps (`~/apps/`)** - Separate git repos, each with its own systemd service and app.json config
+**Apps (`~/apps/`)** - Separate git repos, each with:
+- `caddy.conf` - Caddy routing configuration
+- `app.json` - Display metadata (name, icon, image, description)
+- `<app-name>.service` - Systemd service file
 
-**Port assignments:** 8000=auth, 8001+=apps (check existing app.json files for used ports)
+**Port assignments:** 8000=auth, 8001+=apps (check existing caddy.conf files for used ports)
 
 ## Adding a New App
 
@@ -54,7 +57,7 @@ Internet → Cloudflare (DNS/SSL) → Router → Caddy (reverse proxy) → Apps
 mkdir ~/apps/my-new-app
 cd ~/apps/my-new-app
 git init
-# ... create your app, listening on a port (e.g., 8003)
+# ... create your app, listening on a port (e.g., 8004)
 ```
 
 ### 2. Create app.json
@@ -63,9 +66,6 @@ Create `~/apps/my-new-app/app.json`:
 ```json
 {
   "name": "My New App",
-  "path": "/my-new-app",
-  "port": 8003,
-  "public": false,
   "icon": "🚀",
   "image": null,
   "description": "Short description of the app"
@@ -73,15 +73,37 @@ Create `~/apps/my-new-app/app.json`:
 ```
 
 **Fields:**
-- `name` - Display name on index page
-- `path` - URL path (e.g., `/my-new-app` → `https://doughughes.net/my-new-app`)
-- `port` - Local port the app listens on
-- `public` - `true` = visible to everyone, `false` = requires login
-- `icon` - Emoji fallback if no image
-- `image` - Filename of image in app directory (e.g., `"logo.png"`), or `null`
-- `description` - Short description shown on card
+- `name` - Display name on index page (required)
+- `icon` - Emoji fallback if no image (required)
+- `image` - Filename of image in app directory (e.g., `"logo.png"`), or `null` (optional)
+- `description` - Short description shown on card (required)
 
-### 3. Create a systemd service
+### 3. Create caddy.conf
+
+Create `~/apps/my-new-app/caddy.conf`:
+
+**For a public app (no login required):**
+```caddy
+# My New App
+handle /my-new-app* {
+    uri strip_prefix /my-new-app
+    reverse_proxy localhost:8004
+}
+```
+
+**For a private app (requires login):**
+```caddy
+# My New App
+handle /my-new-app* {
+    forward_auth localhost:8000 {
+        uri /verify
+    }
+    uri strip_prefix /my-new-app
+    reverse_proxy localhost:8004
+}
+```
+
+### 4. Create a systemd service
 
 Create `~/apps/my-new-app/my-new-app.service`:
 ```ini
@@ -109,7 +131,7 @@ sudo systemctl enable my-new-app
 sudo systemctl start my-new-app
 ```
 
-### 4. Deploy infrastructure
+### 5. Deploy infrastructure
 
 ```bash
 cd ~/infrastructure
@@ -117,10 +139,9 @@ sudo ./deploy.sh
 ```
 
 This will:
-1. Read all `~/apps/*/app.json` files
-2. Generate a new Caddyfile with routes for all apps
-3. Restart Caddy with the new config
-4. Restart the auth service (which also reads app.json for the index page)
+1. Copy the main Caddyfile (which imports all app caddy.conf files) to /etc/caddy/
+2. Restart Caddy with the new config
+3. Restart the auth service (which reads app.json for the index page)
 
 ## Modifying an Existing App
 
