@@ -20,7 +20,12 @@ from datetime import datetime, timedelta
 PORT = 8000
 DATA_FILE = os.path.join(os.path.dirname(__file__), "users.json")
 SESSIONS_FILE = os.path.join(os.path.dirname(__file__), "sessions.json")
-APPS_DIR = "/home/dhughes/apps"
+
+# Auto-detect apps directory (prod vs dev)
+PROD_APPS_DIR = "/home/dhughes/apps"
+DEV_APPS_DIR = "/Users/doughughes/Projects/Personal"
+APPS_DIR = os.getenv("APPS_DIR", PROD_APPS_DIR if os.path.exists(PROD_APPS_DIR) else DEV_APPS_DIR)
+
 SESSION_DURATION_DAYS = 30
 
 # In-memory session store (loaded from file for persistence)
@@ -435,11 +440,19 @@ class AuthHandler(BaseHTTPRequestHandler):
                 flex-direction: column;
                 align-items: center;
                 text-align: center;
+                position: relative;
             }
             .app-card:hover {
                 transform: translateY(-4px);
                 box-shadow: 0 4px 16px rgba(0,0,0,0.15);
                 text-decoration: none;
+            }
+            .app-card-lock {
+                position: absolute;
+                top: 12px;
+                right: 12px;
+                font-size: 24px;
+                z-index: 10;
             }
             .app-card-image {
                 width: 256px;
@@ -470,14 +483,6 @@ class AuthHandler(BaseHTTPRequestHandler):
             .app-card-description {
                 font-size: 14px;
                 color: #666;
-            }
-            .app-card-private {
-                opacity: 0.6;
-                pointer-events: none;
-            }
-            .app-card-private .app-card-name::after {
-                content: ' 🔒';
-                font-size: 14px;
             }
 
             /* Forms container */
@@ -529,8 +534,12 @@ class AuthHandler(BaseHTTPRequestHandler):
             else:
                 image_html = f'<div class="app-card-icon">{icon}</div>'
 
+            # Show lock icon for private apps when user is logged in
+            lock_html = '<div class="app-card-lock">🔒</div>' if not is_public and user else ''
+
             cards_html += f'''
             <a href="{path}" class="app-card">
+                {lock_html}
                 {image_html}
                 <div class="app-card-name">{name}</div>
                 <div class="app-card-description">{description}</div>
