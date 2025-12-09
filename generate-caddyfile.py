@@ -46,6 +46,7 @@ def generate_caddyfile(apps):
             lines.append("\t\t\turi /verify")
             lines.append("\t\t}")
 
+        lines.append(f"\t\turi strip_prefix {path}")
         lines.append(f"\t\treverse_proxy localhost:{port}")
         lines.append("\t}")
 
