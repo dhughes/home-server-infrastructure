@@ -51,97 +51,26 @@ Internet → Cloudflare (DNS/SSL) → Router → Caddy (reverse proxy) → Apps
 
 ## Adding a New App
 
-### 1. Create the app directory and code
+**Use the app template at `/Users/doughughes/Projects/Personal/app-template`.**
 
-```bash
-mkdir ~/apps/my-new-app
-cd ~/apps/my-new-app
-git init
-# ... create your app, listening on a port (e.g., 8004)
-```
+See that project's `CLAUDE.md` for detailed instructions on creating a new app.
 
-### 2. Create app.json
+**Quick summary:**
+1. The template copies a complete app skeleton with all required files
+2. Claude will ask you for: name, slug, description, icon, port, public/private
+3. All files get automatically updated with your values
+4. Result is a ready-to-deploy app in `~/apps/<slug>/`
 
-Create `~/apps/my-new-app/app.json`:
-```json
-{
-  "name": "My New App",
-  "icon": "🚀",
-  "image": null,
-  "description": "Short description of the app"
-}
-```
-
-**Fields:**
-- `name` - Display name on index page (required)
-- `icon` - Emoji fallback if no image (required)
-- `image` - Filename of image in app directory (e.g., `"logo.png"`), or `null` (optional)
-- `description` - Short description shown on card (required)
-
-### 3. Create caddy.conf
-
-Create `~/apps/my-new-app/caddy.conf`:
-
-**For a public app (no login required):**
-```caddy
-# My New App
-handle /my-new-app* {
-    uri strip_prefix /my-new-app
-    reverse_proxy localhost:8004
-}
-```
-
-**For a private app (requires login):**
-```caddy
-# My New App
-handle /my-new-app* {
-    forward_auth localhost:8000 {
-        uri /verify
-    }
-    uri strip_prefix /my-new-app
-    reverse_proxy localhost:8004
-}
-```
-
-### 4. Create a systemd service
-
-Create `~/apps/my-new-app/my-new-app.service`:
-```ini
-[Unit]
-Description=My New App
-After=network.target
-
-[Service]
-Type=simple
-User=dhughes
-WorkingDirectory=/home/dhughes/apps/my-new-app
-ExecStart=/path/to/executable
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Install and start:
-```bash
-sudo ln -s /home/dhughes/apps/my-new-app/my-new-app.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable my-new-app
-sudo systemctl start my-new-app
-```
-
-### 5. Deploy infrastructure
-
+**After creating the app:**
 ```bash
 cd ~/infrastructure
 sudo ./deploy.sh
 ```
 
 This will:
-1. Copy the main Caddyfile (which imports all app caddy.conf files) to /etc/caddy/
-2. Restart Caddy with the new config
-3. Restart the auth service (which reads app.json for the index page)
+1. Import your app's `caddy.conf` into the main Caddyfile
+2. Restart Caddy with the new routing
+3. Restart the auth service to show your app on the index page
 
 ## Modifying an Existing App
 
