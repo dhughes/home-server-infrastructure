@@ -207,7 +207,7 @@ class AuthHandler(BaseHTTPRequestHandler):
         return None
 
     def set_cookie(self, name, value, max_age=None):
-        cookie = f"{name}={value}; Path=/; HttpOnly; SameSite=Lax"
+        cookie = f"{name}={value}; Path=/; Domain=.doughughes.net; HttpOnly; SameSite=Lax"
         if max_age is not None:
             cookie += f"; Max-Age={max_age}"
         self.send_header('Set-Cookie', cookie)
