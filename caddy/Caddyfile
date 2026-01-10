@@ -3,10 +3,6 @@ import /home/dhughes/apps/*/caddy-subdomain.conf
 
 doughughes.net, www.doughughes.net {
 	# Import all app configurations
+	# This includes the doughughes-net app which provides the catch-all handler
 	import /home/dhughes/apps/*/caddy.conf
-
-	# Auth service handles: /, /login, /logout, /account, /admin/*, /app-image/*
-	handle {
-		reverse_proxy localhost:8000
-	}
 }

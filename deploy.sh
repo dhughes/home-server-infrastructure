@@ -6,7 +6,7 @@
 # Usage:
 #   ./deploy.sh          - Deploy everything (caddy + all services)
 #   ./deploy.sh caddy    - Deploy only Caddy config
-#   ./deploy.sh auth     - Deploy only auth service
+#   ./deploy.sh auth     - Deploy only doughughes-net service (homepage/auth)
 #   ./deploy.sh services - Deploy all services (not caddy)
 #
 
@@ -22,9 +22,9 @@ deploy_caddy() {
 }
 
 deploy_auth() {
-    echo "Deploying auth service..."
-    systemctl restart auth
-    echo "Auth service restarted."
+    echo "Deploying doughughes-net service..."
+    systemctl restart doughughes-net
+    echo "doughughes-net service restarted."
 }
 
 deploy_services() {

@@ -4,7 +4,8 @@
       "WebSearch",
       "Bash(chmod:*)",
       "Bash(dig:*)",
-      "WebFetch(domain:random-word.doughughes.net)"
+      "WebFetch(domain:random-word.doughughes.net)",
+      "Bash(python3:*)"
     ],
     "additionalDirectories": [
       "/Users/doughughes/Projects/Personal/app-template"

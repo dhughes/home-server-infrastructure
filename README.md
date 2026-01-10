@@ -153,13 +153,21 @@ sudo apt update
 sudo apt install caddy
 ```
 
-## Step 7: Install Auth Service
+## Step 7: Install doughughes-net Homepage/Auth App
+
+The doughughes-net app is now a standalone app in ~/apps/ (not part of infrastructure).
 
 ```bash
-sudo ln -s ~/infrastructure/services/auth/auth.service /etc/systemd/system/
+# Clone the doughughes-net app
+cd ~/apps
+git clone <doughughes-net-repo-url> doughughes-net
+cd doughughes-net
+
+# Install the systemd service
+sudo ln -s ~/apps/doughughes-net/doughughes-net.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable auth
-sudo systemctl start auth
+sudo systemctl enable doughughes-net
+sudo systemctl start doughughes-net
 ```
 
 Default login: `admin` / `changeme` (change immediately after first login!)
@@ -217,17 +225,16 @@ sudo ./deploy.sh
 ```
 
 This will:
-1. Read all `~/apps/*/app.json` files
-2. Generate Caddyfile with routes for all apps
-3. Copy Caddyfile to `/etc/caddy/` and restart Caddy
-4. Restart the auth service
+1. Copy Caddyfile to `/etc/caddy/` (imports all app configs from ~/apps/)
+2. Restart Caddy with updated routing
+3. Restart the doughughes-net service
 
 ## Step 11: Verify Everything
 
 ```bash
 # Check services
 systemctl status caddy
-systemctl status auth
+systemctl status doughughes-net
 systemctl status ddclient
 systemctl status <app-name>
 
@@ -318,25 +325,26 @@ Each app in `~/apps/<app-name>/` needs an `app.json` file:
 ## Directory Structure
 
 ```
-~/infrastructure/           # This repo
-├── CLAUDE.md              # Documentation for Claude Code
-├── README.md              # This file (rebuild guide)
-├── deploy.sh              # Deployment script (passwordless sudo)
-├── generate-caddyfile.py  # Generates Caddyfile from app.json files
-├── caddy/
-│   └── Caddyfile          # Auto-generated, don't edit manually
-└── services/
-    └── auth/
-        ├── app.py         # Auth service + index page
-        ├── auth.service   # Systemd service file
-        ├── users.json     # User credentials (not in git)
-        └── sessions.json  # Active sessions (not in git)
+~/infrastructure/              # This repo
+├── CLAUDE.md                 # Documentation for Claude Code
+├── README.md                 # This file (rebuild guide)
+├── deploy.sh                 # Deployment script (passwordless sudo)
+└── caddy/
+    └── Caddyfile             # Imports app configs via import directives
 
-~/apps/                    # Separate git repo per app
+~/apps/                       # Separate git repo per app
+├── doughughes-net/           # Special app - homepage/auth
+│   ├── app.py                # Homepage + auth service
+│   ├── caddy.conf            # Catch-all handler for root domains
+│   ├── doughughes-net.service # Systemd service file
+│   ├── users.json            # User credentials (not in git)
+│   └── sessions.json         # Active sessions (not in git)
 ├── <app-name>/
-│   ├── app.json           # App configuration
-│   ├── <app-name>.service # Systemd service file
-│   ├── logo.png           # Optional app image
+│   ├── app.json              # App metadata (name, icon, description)
+│   ├── caddy-subdomain.conf  # Subdomain routing config
+│   ├── caddy.conf            # Path-based routing (optional/legacy)
+│   ├── <app-name>.service    # Systemd service file
+│   ├── logo.png              # Optional app image
 │   └── ... (app code)
 ```
 
@@ -345,7 +353,8 @@ Each app in `~/apps/<app-name>/` needs an `app.json` file:
 **What to back up:**
 - `~/infrastructure/` (git repo, push to remote)
 - `~/apps/*/` (git repos, push to remotes)
-- `~/infrastructure/services/auth/users.json` (user credentials - NOT in git)
+- `~/apps/doughughes-net/users.json` (user credentials - NOT in git)
+- `~/apps/doughughes-net/sessions.json` (active sessions - NOT in git)
 - `/etc/ddclient.conf` (contains API token)
 
 **What doesn't need backup:**
