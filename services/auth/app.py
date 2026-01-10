@@ -129,6 +129,27 @@ def parse_caddy_conf(config_path):
         print(f"Warning: Could not parse {config_path}: {e}")
         return None
 
+def parse_caddy_subdomain_conf(config_path):
+    """
+    Parse a caddy-subdomain.conf file to extract subdomain.
+
+    Returns: subdomain string (e.g., 'cranium-charades.doughughes.net')
+    Returns None if parsing fails.
+    """
+    try:
+        with open(config_path, 'r') as f:
+            content = f.read()
+
+        # Extract subdomain from: subdomain.doughughes.net {
+        subdomain_match = re.search(r'^([a-zA-Z0-9\-\.]+)\s*\{', content, re.MULTILINE)
+        if not subdomain_match:
+            return None
+
+        return subdomain_match.group(1)
+    except (IOError, ValueError) as e:
+        print(f"Warning: Could not parse {config_path}: {e}")
+        return None
+
 def load_apps():
     """Load all app configurations from ~/apps/*/app.json and ~/apps/*/caddy.conf"""
     apps = []
@@ -155,6 +176,13 @@ def load_apps():
                 if 'path' not in app or 'port' not in app:
                     print(f"Warning: No caddy.conf and incomplete app.json for {app['_app_dir']}")
                     continue
+
+            # Check for subdomain config
+            caddy_subdomain_path = os.path.join(app['_app_dir'], 'caddy-subdomain.conf')
+            if os.path.exists(caddy_subdomain_path):
+                subdomain = parse_caddy_subdomain_conf(caddy_subdomain_path)
+                if subdomain:
+                    app['subdomain'] = subdomain
 
             apps.append(app)
         except (json.JSONDecodeError, IOError) as e:
@@ -522,11 +550,17 @@ class AuthHandler(BaseHTTPRequestHandler):
                 continue
 
             name = app.get('name', 'Unnamed App')
-            path = app.get('path', '/')
             description = app.get('description', '')
             icon = app.get('icon', '📦')
             image = app.get('image')
             app_dir_name = os.path.basename(app['_app_dir'])
+
+            # Prefer subdomain link if available, otherwise use path
+            subdomain = app.get('subdomain')
+            if subdomain:
+                link = f"https://{subdomain}"
+            else:
+                link = app.get('path', '/')
 
             # Image or icon
             if image:
@@ -538,7 +572,7 @@ class AuthHandler(BaseHTTPRequestHandler):
             lock_html = '<div class="app-card-lock">🔒</div>' if not is_public and user else ''
 
             cards_html += f'''
-            <a href="{path}" class="app-card">
+            <a href="{link}" class="app-card">
                 {lock_html}
                 {image_html}
                 <div class="app-card-name">{name}</div>
