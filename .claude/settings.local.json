@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "WebSearch",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(dig:*)"
     ],
     "additionalDirectories": [
       "/Users/doughughes/Projects/Personal/app-template"

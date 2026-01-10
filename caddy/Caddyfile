@@ -1,3 +1,6 @@
+# Import subdomain configurations at top level
+import /home/dhughes/apps/*/caddy-subdomain.conf
+
 doughughes.net, www.doughughes.net {
 	# Import all app configurations
 	import /home/dhughes/apps/*/caddy.conf
