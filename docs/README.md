@@ -22,80 +22,121 @@ This directory contains planning and implementation documentation for the Previe
 - GitHub Actions workflow
 - Benefits and trade-offs
 
-## Project Phases
+## Epics (Implementation Order)
 
-### Phase 1: Foundation - User Systemd Migration
-Migrate all services to user systemd (except Caddy) to eliminate sudo requirements.
+### Epic 1: Foundation - User Systemd Migration (~8h)
+Migrate all services to user systemd (except Caddy) to eliminate sudo requirements. Keep existing deploy scripts working.
 
 **Key Outcomes:**
 - All apps run as user services
 - No sudo needed for app management
-- App template uses user services
+- Existing deploy scripts still work (need them for bootstrap)
 
-### Phase 2: Port Management & Environment Configuration
-Enable apps to run on configurable ports for parallel development.
+### Epic 2: Simplification (~3.5h)
+Remove centralized auth, add showOnDoughHughesNet field, remove Caddy configs from repos.
+
+**Key Outcomes:**
+- No central authentication (apps handle their own)
+- doughughes-net shows tiles based on showOnDoughHughesNet
+- App repos contain only code + app.json (no Caddy configs)
+
+### Epic 3: Port Management (~3h)
+Enable apps to run on configurable ports via environment variables.
 
 **Key Outcomes:**
 - Apps read PORT from environment
 - Dynamic port allocation (no ranges needed)
 - Can run multiple instances locally
 
-### Phase 3: Deploy Service Development
-Create API service to handle preview deployments and cleanups.
+### Epic 4: Deploy Service Development (~13.5h)
+Build the deploy API using old deployment methods.
 
 **Key Outcomes:**
-- Deploy API running at deploy.doughughes.net
-- Port allocation system working
-- Deploy and cleanup endpoints functional
+- Deploy service built and tested
+- Handles production and preview deployments
+- Port allocation working
+- Ready to be bootstrapped
 
-### Phase 4: GitHub Actions Integration
-Automate preview deployments via GitHub workflows.
+### Epic 5: Bootstrap Deploy Service (~2h)
+Manually deploy deploy-service using old deploy.sh method (can't deploy itself yet).
+
+**Key Outcome:**
+- Deploy service running at deploy.doughughes.net
+
+### Epic 6: Make Deploy Service Self-Deploying (~4.5h) ⭐ **Critical Milestone**
+Add GitHub Actions to deploy-service and validate it can deploy itself.
+
+**Key Outcomes:**
+- Deploy service has GitHub workflows
+- Deploy service can update itself via GitHub Actions
+- **System proven to work before broader rollout**
+
+### Epic 7: GitHub Actions Templates (~3.5h)
+Create generic workflow templates for app-template (now that deploy service is proven).
 
 **Key Outcomes:**
 - Workflows in app-template
-- Auto-deploy on PR open
-- Auto-cleanup on PR close/merge
+- Auto-deploy on PR/push
+- Auto-cleanup on PR close
 
-### Phase 5: App Migration & Rollout
-Roll out preview deployments to all existing apps.
+### Epic 8: App Migration & Rollout (~9-13h)
+Roll out GitHub Actions to all apps, remove legacy deploy scripts.
 
 **Key Outcomes:**
-- All apps have preview deployments
-- Pilot tested and issues resolved
-- Full workflow validated
+- All apps have GitHub workflows
+- Legacy deploy scripts removed
+- All apps deploy via GitHub Actions
 
-### Phase 6: Documentation & Polish
-Complete documentation and optional enhancements.
+### Epic 9: Documentation & Polish (~3-6h)
+Update infrastructure docs, optional enhancements.
 
 **Key Outcomes:**
 - Updated infrastructure docs
 - Optional: monitoring dashboard
 - Optional: auto-cleanup of stale previews
 
-Note: User guide is embedded in app-template workflows and README, not a separate document.
-
 ## Getting Started
 
 1. **Read the vision document** to understand what we're building
-2. **Review the project plan** to see all tickets
+2. **Review the project plan** to see all epics and tickets
 3. **Create GitHub Issues** from the project plan tickets
-4. **Start with TICKET-001** and work through sequentially
+4. **Follow epic order** - critical to do Epic 6 before Epic 7/8
 5. **Track progress** using GitHub Issues and Project board
+
+## Critical Milestone
+
+**Epic 6: Make Deploy Service Self-Deploying** is the key validation point. Once the deploy service can successfully update itself via GitHub Actions, we know the system works and it's safe to migrate other apps.
 
 ## Success Criteria
 
 ✅ All apps migrated to user services
-✅ Deploy service running and tested
+✅ No centralized authentication (apps handle their own)
+✅ Deploy service running and self-deploying
+✅ All Caddy/systemd configs generated dynamically
 ✅ Preview deployments work end-to-end
-✅ GitHub Actions integrated
+✅ Production deployments work via same endpoint
+✅ GitHub Actions integrated for all apps
 ✅ App template ready for new apps
-✅ Documentation complete
+✅ New apps deploy with zero server setup
+✅ Infrastructure repo is minimal (just Caddy glue + docs)
+✅ Legacy deploy scripts removed
 
 ## Estimated Timeline
 
-**Total Time:** 46-59 hours (30 tickets across 8 epics)
-**Critical Path:** ~35-40 hours
-**Optional Features:** ~5 hours
+**Total Time:** 46-59 hours (30 tickets across 9 epics)
+**Critical Path:** ~38-45 hours (through Epic 8)
+**Optional Features:** ~5 hours (Epic 9 optional tickets)
+
+**Epic Breakdown:**
+- Epic 1 (User Systemd): ~8h
+- Epic 2 (Simplification): ~3.5h
+- Epic 3 (Port Management): ~3h
+- Epic 4 (Deploy Service Dev): ~13.5h
+- Epic 5 (Bootstrap): ~2h
+- Epic 6 (Self-Deploying): ~4.5h ⭐ **Key Milestone**
+- Epic 7 (GitHub Actions Templates): ~3.5h
+- Epic 8 (App Rollout): ~9-13h
+- Epic 9 (Documentation): ~3-6h
 
 With focused work sessions, this project could be completed in:
 - **Aggressive:** 1-2 weeks (full-time focus)
