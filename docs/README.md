@@ -8,10 +8,6 @@ This directory contains planning and implementation documentation for the Previe
 - **[Vision & Architecture](preview-deployment-vision.md)** - High-level overview of the system, goals, and architecture
 - **[Project Plan](preview-deployment-project-plan.md)** - Detailed tickets with estimates and dependencies
 
-### Implementation Guides
-- **[Port Allocation](port-allocation.md)** *(Created during TICKET-009)* - Port ranges for each app
-- **[Preview Deployment Guide](preview-deployment-guide.md)** *(Created during TICKET-024)* - User guide for developers
-
 ## Document Purpose
 
 ### preview-deployment-vision.md
@@ -83,10 +79,11 @@ Roll out preview deployments to all existing apps.
 Complete documentation and optional enhancements.
 
 **Key Outcomes:**
-- Comprehensive user guide
 - Updated infrastructure docs
 - Optional: monitoring dashboard
 - Optional: auto-cleanup of stale previews
+
+Note: User guide is embedded in app-template workflows and README, not a separate document.
 
 ## Getting Started
 
@@ -107,7 +104,7 @@ Complete documentation and optional enhancements.
 
 ## Estimated Timeline
 
-**Total Time:** 45-55 hours
+**Total Time:** 43-54 hours (26 tickets)
 **Critical Path:** ~35-40 hours
 **Optional Features:** ~5 hours
 

@@ -4,7 +4,7 @@
 
 Transform home server infrastructure to support parallel development with automatic preview deployments for pull requests.
 
-**Estimated Total Tickets:** 27
+**Estimated Total Tickets:** 26
 **Phases:** 6
 
 ## Key Architectural Decisions
@@ -813,34 +813,7 @@ Roll out to remaining apps:
 
 **Goal:** Complete documentation and add nice-to-have features.
 
-### TICKET-024: Create Preview Deployment Guide
-**Priority:** P1
-**Estimate:** 2 hours
-
-**Description:**
-Comprehensive guide for using preview deployments.
-
-**Location:** `~/infrastructure/docs/preview-deployment-guide.md`
-
-**Contents:**
-- How preview deployments work
-- Developer workflow
-- Testing previews
-- Troubleshooting
-- Best practices
-- Examples
-
-**Acceptance Criteria:**
-- Clear, comprehensive guide
-- Covers common scenarios
-- Troubleshooting section
-- Examples for reference
-
-**Dependencies:** TICKET-023
-
----
-
-### TICKET-025: Update Main Infrastructure Docs
+### TICKET-024: Update Main Infrastructure Docs
 **Priority:** P1
 **Estimate:** 1 hour
 
@@ -863,11 +836,11 @@ Update all infrastructure documentation with preview deployment info.
 - Easy to discover preview deployment info
 - Architecture clear
 
-**Dependencies:** TICKET-024
+**Dependencies:** TICKET-023
 
 ---
 
-### TICKET-026: Add Deploy Service Monitoring (Optional)
+### TICKET-025: Add Deploy Service Monitoring (Optional)
 **Priority:** P2
 **Estimate:** 3 hours
 
@@ -891,11 +864,11 @@ Basic monitoring and dashboard for deploy service.
 - Shows useful info
 - Helps with debugging
 
-**Dependencies:** TICKET-024
+**Dependencies:** TICKET-023
 
 ---
 
-### TICKET-027: Add Auto-Cleanup for Stale Previews (Optional)
+### TICKET-026: Add Auto-Cleanup for Stale Previews (Optional)
 **Priority:** P3
 **Estimate:** 2 hours
 
@@ -914,13 +887,13 @@ Automatically cleanup preview deployments older than 30 days.
 - Configurable age threshold
 - Runs daily via cron
 
-**Dependencies:** TICKET-024
+**Dependencies:** TICKET-023
 
 ---
 
 ## Summary
 
-**Total Estimated Time:** 45-56 hours
+**Total Estimated Time:** 43-54 hours (26 tickets)
 
 **Phase Breakdown:**
 - Phase 1 (Foundation): ~8 hours
@@ -928,7 +901,7 @@ Automatically cleanup preview deployments older than 30 days.
 - Phase 3 (Deploy Service): ~13.5 hours (unified deploy endpoint)
 - Phase 4 (GitHub Actions): ~7.5 hours (unified workflows)
 - Phase 5 (Migration): ~8-12 hours
-- Phase 6 (Docs & Polish): ~5-8 hours (optional items add more)
+- Phase 6 (Docs & Polish): ~3-6 hours (2 optional tickets)
 
 **Key Simplifications from Original Plan:**
 - No per-app port ranges (dynamic allocation only)
