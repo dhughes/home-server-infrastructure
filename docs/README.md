@@ -37,7 +37,7 @@ Enable apps to run on configurable ports for parallel development.
 
 **Key Outcomes:**
 - Apps read PORT from environment
-- Port ranges defined for each app
+- Dynamic port allocation (no ranges needed)
 - Can run multiple instances locally
 
 ### Phase 3: Deploy Service Development
