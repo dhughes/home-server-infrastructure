@@ -45,25 +45,30 @@ Create a parallelizable "vibe coding" infrastructure that enables rapid developm
 
 ### Port Allocation Strategy
 
-**Port Ranges Per App:**
-```
-color-the-map:
-  Production: 8005
-  Previews: 9000-9099 (100 concurrent PRs max)
-
-home-inventory:
-  Production: 8003
-  Previews: 9100-9199
-
-cranium-charades:
-  Production: 8004
-  Previews: 9200-9299
-```
+**Dynamic Allocation (First Available Port):**
+- All deployments (production and preview) use dynamic port allocation
+- Deploy service tracks allocations in `~/preview-deployments/ports.json`
+- Each deployment gets the next available port starting at 8000
+- Ports are stable (same deployment ID always gets same port)
+- No manual port configuration or range planning needed
+- No distinction between production and preview ports
 
 **Port Tracking:**
-- JSON file on server: `~/preview-deployments/ports.json`
-- Deploy service allocates next available port from range
-- Cleanup frees ports back to pool
+```json
+{
+  "doughughes-net": 8000,
+  "random-word": 8001,
+  "lottery-numbers": 8002,
+  "home-inventory": 8003,
+  "cranium-charades": 8004,
+  "color-the-map": 8005,
+  "color-the-map-pr-123": 8006,
+  "new-app": 8007,
+  "new-app-pr-1": 8008
+}
+```
+
+**Key Insight:** Production is just a deployment that never gets cleaned up. The deployment ID for production is just the app name (e.g., `"color-the-map"`), while previews use `"{app}-pr-{number}"` (e.g., `"color-the-map-pr-123"`). Production and preview deployments use identical logic.
 
 ### Service Management
 
@@ -87,26 +92,63 @@ cranium-charades:
 
 **Endpoints:**
 ```
-POST /api/preview/deploy
-  - Clone branch to ~/apps/{app}-pr-{number}
-  - Allocate port from range
-  - Generate user systemd service
-  - Generate caddy-subdomain.conf
-  - Start service
-  - Reload Caddy (graceful)
-  - Return preview URL
+POST /api/deploy
+  Input: {
+    "api_key": "secret",
+    "app_name": "color-the-map",
+    "branch": "main" or "feature/foo",
+    "pr_number": null (for production) or 123 (for preview),
+    "repo_url": "https://github.com/user/color-the-map"
+  }
 
-POST /api/preview/cleanup
+  Actions:
+  - Calculate deployment_id: "{app}" or "{app}-pr-{number}"
+  - Check if deployment exists (reuse port) or allocate new port
+  - Clone/pull branch to ~/apps/{deployment_id}
+  - Generate user systemd service with PORT environment variable
+  - Generate caddy-subdomain.conf with correct subdomain
+  - Start/restart service
+  - Reload Caddy (graceful)
+  - Return deployment URL
+
+  Production deploy: pr_number=null, subdomain={app}.doughughes.net
+  Preview deploy: pr_number=123, subdomain=pr-123.{app}.doughughes.net
+
+POST /api/cleanup
+  Input: {
+    "api_key": "secret",
+    "app_name": "color-the-map",
+    "pr_number": 123
+  }
+
+  Actions:
+  - Validate pr_number is provided (cannot cleanup production)
   - Stop user service
   - Remove app directory
-  - Free port
-  - Remove Caddy config
-  - Reload Caddy
+  - Free port from allocations
+  - Reload Caddy (config auto-updates via import)
 
-GET /api/preview/status
-  - List all active previews
-  - Show port allocations
-  - Service health status
+GET /api/status
+  Output: {
+    "deployments": [
+      {
+        "id": "color-the-map",
+        "type": "production",
+        "url": "https://color-the-map.doughughes.net",
+        "port": 8005,
+        "status": "running"
+      },
+      {
+        "id": "color-the-map-pr-123",
+        "type": "preview",
+        "pr": 123,
+        "url": "https://pr-123.color-the-map.doughughes.net",
+        "port": 8006,
+        "status": "running"
+      }
+    ],
+    "next_available_port": 8007
+  }
 ```
 
 ### Caddy Dynamic Configuration
@@ -126,19 +168,49 @@ GET /api/preview/status
 **On PR Open/Update:**
 ```
 1. Run tests, linters, type checks
-2. If pass: POST to deploy.doughughes.net/api/preview/deploy
-3. Comment on PR with preview URL
+2. If pass: POST to deploy.doughughes.net/api/deploy
+   - app_name: from repo
+   - branch: PR branch
+   - pr_number: PR number
+3. Comment on PR with preview URL: pr-{number}.{app}.doughughes.net
+```
+
+**On Push to Main (merge or direct push):**
+```
+1. Run tests, linters, type checks
+2. If pass: POST to deploy.doughughes.net/api/deploy
+   - app_name: from repo
+   - branch: "main"
+   - pr_number: null
+3. This creates/updates production deployment at {app}.doughughes.net
 ```
 
 **On PR Merge to Main:**
 ```
-1. Deploy to production subdomain
-2. POST to deploy.doughughes.net/api/preview/cleanup (delete preview)
+1. Deploy production (see above)
+2. POST to deploy.doughughes.net/api/cleanup
+   - app_name: from repo
+   - pr_number: PR number
+3. This removes the preview deployment
 ```
 
 **On PR Close (without merge):**
 ```
-1. POST to deploy.doughughes.net/api/preview/cleanup
+1. POST to deploy.doughughes.net/api/cleanup
+   - app_name: from repo
+   - pr_number: PR number
+```
+
+**New App Creation:**
+```
+1. Clone app-template to new repo
+2. Customize app.json and code
+3. Add DEPLOY_API_KEY to GitHub secrets
+4. Create first PR
+5. Preview deploys automatically to pr-1.{app}.doughughes.net
+6. Merge PR
+7. Production deploys automatically to {app}.doughughes.net
+8. Zero server-side setup required!
 ```
 
 ### Local Development with Worktrees

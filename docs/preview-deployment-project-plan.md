@@ -4,8 +4,30 @@
 
 Transform home server infrastructure to support parallel development with automatic preview deployments for pull requests.
 
-**Estimated Total Tickets:** 25-30
-**Phases:** 5
+**Estimated Total Tickets:** 27
+**Phases:** 6
+
+## Key Architectural Decisions
+
+### Unified Deployment Logic
+- Production and preview deployments use the **same** /api/deploy endpoint
+- Production: `pr_number=null`, deploys to `{app}.doughughes.net`
+- Preview: `pr_number=123`, deploys to `pr-123.{app}.doughughes.net`
+- No distinction in deployment logic - production is just a deployment that never gets cleaned up
+
+### Dynamic Port Allocation
+- No manual port configuration or per-app ranges
+- All deployments get next available port starting at 8000
+- Existing deployments reuse their port
+- Tracked in simple `ports.json` file
+
+### New App Creation (Zero Server Setup)
+1. Clone app-template to new repo
+2. Customize and push to GitHub
+3. Add DEPLOY_API_KEY to repo secrets
+4. Create first PR → preview deploys automatically
+5. Merge PR → production deploys automatically to new subdomain
+6. **No server-side configuration required!**
 
 ---
 
@@ -182,17 +204,17 @@ Update all infrastructure docs to reflect user systemd usage.
 **Estimate:** 30 minutes
 
 **Description:**
-Update app-template to read port from environment variable.
+Update app-template to read port from environment variable. Apps no longer have hardcoded ports - the deploy service assigns them dynamically.
 
 **Tasks:**
-- Update `app.py` to read: `PORT = int(os.getenv('PORT', 7999))`
-- Update README/CLAUDE.md with port override instructions
-- Document port range allocation strategy
+- Update `app.py` to read: `PORT = int(os.getenv('PORT', 8000))`
+- Update README/CLAUDE.md to explain PORT is set by systemd service
+- Note: Port is provided by deploy service, not configured by developer
 
 **Acceptance Criteria:**
 - App reads PORT from environment
-- Falls back to default if not set
-- Documentation explains usage
+- Falls back to 8000 if not set (for local dev)
+- Documentation explains PORT is deployment-managed
 
 **Dependencies:** TICKET-005
 
@@ -203,55 +225,62 @@ Update app-template to read port from environment variable.
 **Estimate:** 2 hours
 
 **Description:**
-Update all existing apps to support PORT environment variable.
+Update all existing apps to support PORT environment variable. After migration, existing production deployments will keep their current ports (tracked in ports.json).
 
 **Apps to update:**
-- doughughes-net (default 8000)
-- color-the-map (default 8005)
-- home-inventory (default 8003)
-- cranium-charades (default 8004)
-- random-word (default 8001)
-- lottery-numbers (default 8002)
+- doughughes-net (currently 8000)
+- color-the-map (currently 8005)
+- home-inventory (currently 8003)
+- cranium-charades (currently 8004)
+- random-word (currently 8001)
+- lottery-numbers (currently 8002)
 
 **Tasks:**
 - For each app:
-  - Update port reading logic
-  - Test with custom PORT
+  - Update port reading logic: `PORT = int(os.getenv('PORT', 8000))`
+  - Test with custom PORT locally
   - Commit and push changes
-  - Deploy to production (should use default)
+  - Note: Production deployment will continue using current port (no change)
 
 **Acceptance Criteria:**
 - All apps respect PORT environment variable
-- Production apps still use correct ports (defaults work)
-- Can run app on different port locally
+- Can run app on different port locally for worktree development
+- Production apps continue working on existing ports
 
 **Dependencies:** TICKET-007
 
 ---
 
-### TICKET-009: Define Port Allocation Strategy
+### TICKET-009: Initialize Port Allocation Tracking
 **Priority:** P0
-**Estimate:** 1 hour
+**Estimate:** 30 minutes
 
 **Description:**
-Document port ranges for each app's preview deployments.
+Create initial port allocation file with existing production deployments. All future deployments (production and preview) will use dynamic allocation starting at next available port.
 
 **Tasks:**
-- Create `~/infrastructure/docs/port-allocation.md`
-- Define ranges:
-  - doughughes-net: 8000 (prod), 10000-10099 (previews)
-  - random-word: 8001 (prod), 10100-10199 (previews)
-  - lottery-numbers: 8002 (prod), 10200-10299 (previews)
-  - home-inventory: 8003 (prod), 10300-10399 (previews)
-  - cranium-charades: 8004 (prod), 10400-10499 (previews)
-  - color-the-map: 8005 (prod), 10500-10599 (previews)
-  - app-template: 7999 (prod), 10600-10699 (previews)
-- Document allocation in app-template CLAUDE.md
+- Create `~/preview-deployments/ports.json` structure
+- Document current production allocations:
+  ```json
+  {
+    "doughughes-net": 8000,
+    "random-word": 8001,
+    "lottery-numbers": 8002,
+    "home-inventory": 8003,
+    "cranium-charades": 8004,
+    "color-the-map": 8005
+  }
+  ```
+- Create `~/infrastructure/docs/port-allocation.md` documenting:
+  - Dynamic allocation strategy (find first available port)
+  - No per-app ranges needed
+  - Production and preview use same allocation logic
+  - Existing production apps keep their current ports
 
 **Acceptance Criteria:**
-- Clear port range for each app
-- No overlapping ranges
-- Documented and discoverable
+- Port allocation file exists with current production ports
+- Documentation explains dynamic allocation
+- No manual port assignment needed for new deployments
 
 **Dependencies:** TICKET-008
 
@@ -271,17 +300,18 @@ Set up deploy-service app with basic structure.
 **Tasks:**
 - Create `~/apps/deploy-service/` directory
 - Create basic Flask/FastAPI app with endpoints:
-  - POST /api/preview/deploy
-  - POST /api/preview/cleanup
-  - GET /api/preview/status
+  - POST /api/deploy (handles both production and preview)
+  - POST /api/cleanup (preview only)
+  - GET /api/status
   - GET /health
 - Add API key authentication
 - Create `deploy-service.service` (user service)
 - Create `caddy-subdomain.conf` for deploy.doughughes.net
 - Add basic logging
+- Note: Deploy service itself gets a port via manual allocation (bootstrap)
 
 **Acceptance Criteria:**
-- Service runs on port 8100
+- Service runs on dynamically allocated port
 - Endpoints return 200 OK with stub responses
 - API key authentication works
 - Accessible at deploy.doughughes.net (private)
@@ -292,84 +322,92 @@ Set up deploy-service app with basic structure.
 
 ### TICKET-011: Implement Port Allocation Logic
 **Priority:** P0
-**Estimate:** 2 hours
+**Estimate:** 1.5 hours
 
 **Description:**
-Implement port tracking and allocation in deploy service.
+Implement simple dynamic port allocation in deploy service. No ranges needed - just find the next available port starting at 8000.
 
 **Tasks:**
-- Create `~/preview-deployments/ports.json` structure
-- Implement `allocate_port(app_name)` function
-  - Reads app's port range from config
-  - Finds next available port
-  - Updates ports.json
-  - Returns allocated port
-- Implement `free_port(app_name, pr_number)` function
-- Add locking for concurrent deployments
-- Handle port exhaustion gracefully
+- Load/save `~/preview-deployments/ports.json`
+- Implement `get_or_allocate_port(deployment_id)` function:
+  - Check if deployment_id already has a port (reuse it)
+  - If not, find first unused port starting at 8000
+  - Update ports.json
+  - Return allocated port
+- Implement `free_port(deployment_id)` function:
+  - Remove from ports.json
+  - Return freed port
+- Add file locking for concurrent deployments (fcntl)
+- No port exhaustion possible (unlimited ports above 8000)
 
 **Acceptance Criteria:**
-- Can allocate ports from ranges
-- Ports are tracked correctly
-- Concurrent requests don't allocate same port
-- Clear error if range exhausted
+- Same deployment always gets same port
+- New deployments get next available port
+- Concurrent requests don't allocate same port (file locking)
 - Ports freed on cleanup
+- Works for both production and preview deployments
 
 **Dependencies:** TICKET-010
 
 ---
 
-### TICKET-012: Implement Preview Deploy Endpoint
+### TICKET-012: Implement Unified Deploy Endpoint
 **Priority:** P0
-**Estimate:** 4 hours
+**Estimate:** 5 hours
 
 **Description:**
-Implement POST /api/preview/deploy endpoint logic.
+Implement POST /api/deploy endpoint that handles both production and preview deployments using identical logic.
 
 **Input:**
 ```json
 {
   "api_key": "secret",
   "app_name": "color-the-map",
-  "pr_number": 123,
-  "branch": "feature/foo",
+  "branch": "main" or "feature/foo",
+  "pr_number": null (for production) or 123 (for preview),
   "repo_url": "https://github.com/user/color-the-map"
 }
 ```
 
 **Tasks:**
-- Validate inputs
-- Clone branch to `~/apps/{app}-pr-{number}`
-- Allocate port from range
-- Generate systemd service file
-  - Name: `{app}-pr-{number}.service`
-  - WorkingDirectory: `~/apps/{app}-pr-{number}`
+- Validate inputs and authenticate API key
+- Calculate deployment_id: `{app}` (prod) or `{app}-pr-{number}` (preview)
+- Calculate subdomain: `{app}.doughughes.net` (prod) or `pr-{number}.{app}.doughughes.net` (preview)
+- Check if deployment exists (git pull) or clone fresh
+- Get or allocate port for this deployment_id
+- Generate systemd service file:
+  - Name: `{deployment_id}.service`
+  - WorkingDirectory: `~/apps/{deployment_id}`
   - Environment: PORT={allocated_port}
-- Generate `caddy-subdomain.conf`
-  - Subdomain: `pr-{number}.{app}.doughughes.net`
+- Generate `caddy-subdomain.conf`:
+  - Subdomain: calculated above
   - Reverse proxy to localhost:{port}
-- Install service: `systemctl --user enable {service}`
-- Start service: `systemctl --user start {service}`
+  - Include forward_auth if app is private (parse from repo's config)
+- Install/update service: `systemctl --user enable {service}`
+- Restart service: `systemctl --user restart {service}`
 - Reload Caddy: `sudo caddy reload --config /etc/caddy/Caddyfile`
-- Return preview URL
+- Return deployment URL
 
 **Acceptance Criteria:**
-- Endpoint successfully deploys preview
-- Service is running
-- Subdomain is accessible
-- Returns correct preview URL
+- Production deployments work (pr_number=null)
+- Preview deployments work (pr_number provided)
+- Redeploying existing deployment reuses same port
+- New deployments get next available port
+- Service is running and accessible
+- Returns correct URL
 - Handles errors gracefully (cleanup on failure)
+- Works for brand new apps (zero manual setup)
 
 **Dependencies:** TICKET-011
 
 ---
 
-### TICKET-013: Implement Preview Cleanup Endpoint
+### TICKET-013: Implement Cleanup Endpoint
 **Priority:** P0
 **Estimate:** 2 hours
 
 **Description:**
-Implement POST /api/preview/cleanup endpoint logic.
+Implement POST /api/cleanup endpoint for tearing down preview deployments. Production deployments cannot be cleaned up via this endpoint.
 
 **Input:**
 ```json
@@ -381,15 +419,18 @@ Implement POST /api/preview/cleanup endpoint logic.
 ```
 
 **Tasks:**
-- Stop service: `systemctl --user stop {app}-pr-{number}`
-- Disable service: `systemctl --user disable {app}-pr-{number}`
+- Validate pr_number is provided (cannot cleanup production deployments)
+- Calculate deployment_id: `{app}-pr-{number}`
+- Stop service: `systemctl --user stop {deployment_id}`
+- Disable service: `systemctl --user disable {deployment_id}`
 - Remove service file from `~/.config/systemd/user/`
-- Remove app directory: `~/apps/{app}-pr-{number}`
+- Remove app directory: `~/apps/{deployment_id}`
 - Free port in ports.json
-- Reload Caddy (config auto-updates via import)
+- Reload Caddy: `sudo caddy reload --config /etc/caddy/Caddyfile`
 - Return success response
 
 **Acceptance Criteria:**
+- Rejects cleanup requests without pr_number (production protection)
 - Service is stopped and removed
 - Directory is deleted
 - Port is freed
@@ -405,38 +446,49 @@ Implement POST /api/preview/cleanup endpoint logic.
 **Estimate:** 1 hour
 
 **Description:**
-Implement GET /api/preview/status endpoint.
+Implement GET /api/status endpoint showing all deployments (production and preview).
 
 **Output:**
 ```json
 {
-  "active_previews": [
+  "deployments": [
     {
+      "id": "color-the-map",
+      "type": "production",
+      "url": "https://color-the-map.doughughes.net",
+      "port": 8005,
+      "status": "running"
+    },
+    {
+      "id": "color-the-map-pr-123",
+      "type": "preview",
       "app": "color-the-map",
       "pr": 123,
       "url": "https://pr-123.color-the-map.doughughes.net",
-      "port": 10500,
+      "port": 8006,
       "status": "running"
     }
   ],
-  "port_usage": {
-    "color-the-map": "1/100"
-  }
+  "next_available_port": 8007,
+  "total_deployments": 2,
+  "production_count": 1,
+  "preview_count": 1
 }
 ```
 
 **Tasks:**
-- List all `*-pr-*` services
-- Parse service files for metadata
-- Check service status
+- List all user services
+- Distinguish production (no pr in name) from preview (has -pr- in name)
+- Parse service files for metadata if needed
+- Check service status via systemctl
 - Read ports.json for port info
 - Return formatted response
 
 **Acceptance Criteria:**
-- Shows all active previews
+- Shows all deployments (production and preview)
 - Accurate service status
-- Port usage info
-- Useful for debugging
+- Next available port shown
+- Useful for debugging and monitoring
 
 **Dependencies:** TICKET-013
 
@@ -504,15 +556,21 @@ jobs:
   deploy-preview:
     needs: test
     if: success()
-    - POST to deploy.doughughes.net/api/preview/deploy
-    - Comment on PR with preview URL
+    - Extract app name from repo
+    - POST to deploy.doughughes.net/api/deploy
+      - app_name: extracted
+      - branch: ${{ github.head_ref }}
+      - pr_number: ${{ github.event.pull_request.number }}
+      - repo_url: ${{ github.repository }}
+    - Comment on PR with preview URL: pr-{number}.{app}.doughughes.net
 ```
 
 **Tasks:**
 - Create workflow file
-- Add API key as GitHub secret
+- Add DEPLOY_API_KEY as GitHub secret (repo or org level)
+- Extract app name from repo name or config
 - Implement PR comment with preview URL
-- Add status badges
+- Add status badges (optional)
 - Test with dummy PR
 
 **Acceptance Criteria:**
@@ -521,6 +579,7 @@ jobs:
 - Only deploys if tests pass
 - Posts preview URL to PR
 - API key secure in secrets
+- Works for any app without customization
 
 **Dependencies:** TICKET-015
 
@@ -528,10 +587,10 @@ jobs:
 
 ### TICKET-017: Create Production Deploy Workflow Template
 **Priority:** P0
-**Estimate:** 1 hour
+**Estimate:** 1.5 hours
 
 **Description:**
-Create workflow for production deployment on merge.
+Create workflow for production deployment on push to main. Uses the same /api/deploy endpoint as previews, but with pr_number=null.
 
 **Location:** `app-template/.github/workflows/deploy-production.yml`
 
@@ -542,23 +601,37 @@ on:
     branches: [main]
 
 jobs:
-  deploy:
-    - SSH to server (or call deploy API)
-    - Deploy to production subdomain
-    - Cleanup preview if exists (merged PR)
+  test:
+    - Run tests
+    - Run linters
+    - Type checking
+
+  deploy-production:
+    needs: test
+    if: success()
+    - Extract app name from repo
+    - POST to deploy.doughughes.net/api/deploy
+      - app_name: extracted
+      - branch: "main"
+      - pr_number: null
+      - repo_url: ${{ github.repository }}
+    - Creates/updates {app}.doughughes.net
 ```
 
 **Tasks:**
 - Create workflow file
-- Add SSH key or API call
-- Clean up preview deployment
-- Test deployment
+- Use same DEPLOY_API_KEY secret as preview workflow
+- Extract app name from repo name or config
+- Call unified deploy endpoint with pr_number=null
+- Test with push to main
 
 **Acceptance Criteria:**
-- Triggers on merge to main
+- Triggers on push to main
+- Tests run before deployment
+- Calls deploy endpoint correctly (pr_number=null)
 - Production deployment succeeds
-- Preview cleaned up if exists
-- Production subdomain updated
+- Works for brand new apps (first merge creates production)
+- Uses same API endpoint as preview (unified logic)
 
 **Dependencies:** TICKET-016
 
@@ -569,7 +642,7 @@ jobs:
 **Estimate:** 1 hour
 
 **Description:**
-Create workflow to cleanup preview on PR close.
+Create workflow to cleanup preview deployments on PR close (whether merged or abandoned).
 
 **Location:** `app-template/.github/workflows/cleanup-preview.yml`
 
@@ -581,14 +654,23 @@ on:
 
 jobs:
   cleanup:
-    - POST to deploy.doughughes.net/api/preview/cleanup
+    - Extract app name from repo
+    - POST to deploy.doughughes.net/api/cleanup
+      - app_name: extracted
+      - pr_number: ${{ github.event.pull_request.number }}
+    - Removes preview deployment (pr-{number}.{app}.doughughes.net)
+
+Note: If PR was merged, production already deployed via TICKET-017 workflow.
+This just cleans up the preview instance.
 ```
 
 **Tasks:**
 - Create workflow file
+- Use same DEPLOY_API_KEY secret
+- Extract app name
 - Call cleanup endpoint
-- Handle both merged and closed PRs
-- Test with closed PR
+- Test with closed PR (both merged and abandoned)
+- Verify it's safe to call even if preview doesn't exist (idempotent)
 
 **Acceptance Criteria:**
 - Triggers when PR closed (merged or not)
@@ -838,15 +920,20 @@ Automatically cleanup preview deployments older than 30 days.
 
 ## Summary
 
-**Total Estimated Time:** 45-55 hours
+**Total Estimated Time:** 45-56 hours
 
 **Phase Breakdown:**
 - Phase 1 (Foundation): ~8 hours
-- Phase 2 (Port Management): ~3.5 hours
-- Phase 3 (Deploy Service): ~14 hours
-- Phase 4 (GitHub Actions): ~7 hours
+- Phase 2 (Port Management): ~3 hours (simplified - dynamic allocation)
+- Phase 3 (Deploy Service): ~13.5 hours (unified deploy endpoint)
+- Phase 4 (GitHub Actions): ~7.5 hours (unified workflows)
 - Phase 5 (Migration): ~8-12 hours
 - Phase 6 (Docs & Polish): ~5-8 hours (optional items add more)
+
+**Key Simplifications from Original Plan:**
+- No per-app port ranges (dynamic allocation only)
+- Unified deploy endpoint (production and preview use same logic)
+- Zero server setup for new apps (automatic allocation)
 
 **Critical Path:**
 TICKET-001 → 002 → 003 → 004 → 007 → 008 → 009 → 010 → 011 → 012 → 013 → 015 → 016 → 017 → 018 → 019 → 020 → 021 → 024
@@ -865,6 +952,8 @@ TICKET-001 → 002 → 003 → 004 → 007 → 008 → 009 → 010 → 011 → 0
 - ✅ All apps migrated to user services
 - ✅ Deploy service running and tested
 - ✅ Preview deployments work end-to-end
+- ✅ Production deployments work via same endpoint
 - ✅ GitHub Actions integrated
 - ✅ App template ready for new apps
+- ✅ New apps can be created and deployed with zero server setup
 - ✅ Documentation complete
