@@ -7,7 +7,6 @@ This directory contains planning and implementation documentation for the Previe
 ### Planning Documents
 - **[Vision & Architecture](preview-deployment-vision.md)** - High-level overview of the system, goals, and architecture
 - **[Project Plan](preview-deployment-project-plan.md)** - Detailed tickets with estimates and dependencies
-- **[Ticket Tracker](preview-deployment-tickets.md)** - Status tracking and progress monitoring
 
 ### Implementation Guides
 - **[Port Allocation](port-allocation.md)** *(Created during TICKET-009)* - Port ranges for each app
@@ -37,14 +36,6 @@ This directory contains planning and implementation documentation for the Previe
 - Dependencies between tickets
 - Risk areas and mitigation
 
-### preview-deployment-tickets.md
-**When to read:** Throughout project
-**Purpose:** Track progress and status
-**Contains:**
-- Status indicators for each ticket
-- Progress summary
-- Critical path visualization
-- Notes and blockers
 
 ## Project Phases
 
@@ -101,9 +92,9 @@ Complete documentation and optional enhancements.
 
 1. **Read the vision document** to understand what we're building
 2. **Review the project plan** to see all tickets
-3. **Start with TICKET-001** and work through sequentially
-4. **Update the ticket tracker** as you complete tickets
-5. **Take notes** in the tickets document for future reference
+3. **Create GitHub Issues** from the project plan tickets
+4. **Start with TICKET-001** and work through sequentially
+5. **Track progress** using GitHub Issues and Project board
 
 ## Success Criteria
 
