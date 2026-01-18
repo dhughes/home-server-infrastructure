@@ -4,9 +4,6 @@
 
 Transform home server infrastructure to support parallel development with automatic preview deployments for pull requests.
 
-**Estimated Total Tickets:** 27
-**Phases:** 6
-
 ## Key Architectural Decisions
 
 ### Unified Deployment Logic
@@ -21,6 +18,16 @@ Transform home server infrastructure to support parallel development with automa
 - Existing deployments reuse their port
 - Tracked in simple `ports.json` file
 
+### Generated Configuration
+- Deploy service generates all Caddy configs and systemd services
+- Apps contain only code, app.json, and GitHub workflows
+- No Caddy or systemd files in app repos
+
+### No Centralized Authentication
+- Removed forward_auth and central login system
+- Each app handles its own authentication (or is public)
+- doughughes-net homepage shows tiles based on `showOnDoughHughesNet` field in app.json
+
 ### New App Creation (Zero Server Setup)
 1. Clone app-template to new repo
 2. Customize and push to GitHub
@@ -31,11 +38,15 @@ Transform home server infrastructure to support parallel development with automa
 
 ---
 
-## Phase 1: Foundation - User Systemd Migration
+# Epic 1: Foundation - User Systemd Migration
 
 **Goal:** Eliminate sudo requirements for app management by migrating to user systemd services.
 
-### TICKET-001: Server Setup for User Systemd
+**Estimated Time:** ~8 hours
+
+---
+
+## Server Setup for User Systemd
 **Priority:** P0 (Blocker)
 **Estimate:** 30 minutes
 
@@ -58,7 +69,7 @@ One-time server configuration to enable user systemd services.
 
 ---
 
-### TICKET-002: Create Migration Script for Systemd Services
+## Create Migration Script for Systemd Services
 **Priority:** P0
 **Estimate:** 2 hours
 
@@ -83,11 +94,11 @@ Create script to migrate existing system services to user services.
 - User service runs without errors
 - Script can be run multiple times safely (idempotent)
 
-**Dependencies:** TICKET-001
+**Dependencies:** Server Setup for User Systemd
 
 ---
 
-### TICKET-003: Migrate doughughes-net to User Service
+## Migrate doughughes-net to User Service
 **Priority:** P0
 **Estimate:** 1 hour
 
@@ -108,11 +119,11 @@ Migrate doughughes-net app to user systemd service.
 - www.doughughes.net still accessible
 - Service auto-starts on boot
 
-**Dependencies:** TICKET-002
+**Dependencies:** Create Migration Script for Systemd Services
 
 ---
 
-### TICKET-004: Migrate All Apps to User Services
+## Migrate All Apps to User Services
 **Priority:** P0
 **Estimate:** 2 hours
 
@@ -139,11 +150,11 @@ Migrate remaining apps to user systemd services.
 - No sudo required for app restarts
 - All services auto-start on boot
 
-**Dependencies:** TICKET-003
+**Dependencies:** Migrate doughughes-net to User Service
 
 ---
 
-### TICKET-005: Update App Template for User Services
+## Update App Template for User Services
 **Priority:** P1
 **Estimate:** 1 hour
 
@@ -164,11 +175,11 @@ Update app-template to use user systemd services.
 - No manual service migration needed for new apps
 - Documentation is accurate
 
-**Dependencies:** TICKET-004
+**Dependencies:** Migrate All Apps to User Services
 
 ---
 
-### TICKET-006: Update Infrastructure Documentation
+## Update Infrastructure Documentation for User Services
 **Priority:** P1
 **Estimate:** 1 hour
 
@@ -191,15 +202,120 @@ Update all infrastructure docs to reflect user systemd usage.
 - Setup instructions are clear
 - No references to sudo for app services (except Caddy)
 
-**Dependencies:** TICKET-005
+**Dependencies:** Update App Template for User Services
 
 ---
 
-## Phase 2: Port Management & Environment Configuration
+# Epic 2: Simplification - Remove Auth & Centralize Config
+
+**Goal:** Remove centralized authentication and prepare apps for deploy-service-managed configuration.
+
+**Estimated Time:** ~3.5 hours
+
+---
+
+## Remove Authentication from doughughes-net
+**Priority:** P0
+**Estimate:** 2 hours
+
+**Description:**
+Remove all authentication features from doughughes-net app. It becomes a simple homepage displaying app tiles.
+
+**Tasks:**
+- Remove login/logout endpoints and UI
+- Remove /verify endpoint (forward_auth)
+- Remove user management (/account, /admin/users)
+- Remove session management code
+- Remove users.json and sessions.json
+- Simplify to just: index page, app discovery, tile display
+- Update app.json scanning to check `showOnDoughHughesNet` field
+- Remove lock icons and logged-in/logged-out logic
+- Remove cookie domain logic (no longer needed)
+- Test locally
+
+**Acceptance Criteria:**
+- No authentication code remains
+- Homepage shows tiles for apps with showOnDoughHughesNet: true
+- No login/logout functionality
+- Simplified codebase
+- Still displays app tiles correctly
+
+**Dependencies:** Update Infrastructure Documentation for User Services
+
+---
+
+## Add showOnDoughHughesNet to App JSONs
+**Priority:** P0
+**Estimate:** 30 minutes
+
+**Description:**
+Add `showOnDoughHughesNet` field to all existing app.json files.
+
+**Apps to update:**
+- color-the-map: true
+- home-inventory: true
+- cranium-charades: true
+- random-word: true
+- lottery-numbers: true
+- doughughes-net: false (doesn't show itself)
+- app-template: false (template shouldn't show)
+
+**Tasks:**
+- Update each app's app.json
+- Commit changes to each repo
+- Test that doughughes-net homepage shows correct apps
+
+**Acceptance Criteria:**
+- All apps have showOnDoughHughesNet field
+- doughughes-net displays correct apps
+- Template has field set to false
+
+**Dependencies:** Remove Authentication from doughughes-net
+
+---
+
+## Remove Caddy Configs from App Repos
+**Priority:** P0
+**Estimate:** 1 hour
+
+**Description:**
+Remove caddy.conf and caddy-subdomain.conf from all app repos since deploy service will generate them dynamically.
+
+**Apps to update:**
+- color-the-map
+- home-inventory
+- cranium-charades
+- random-word
+- lottery-numbers
+- doughughes-net
+- app-template
+
+**Tasks:**
+- Delete caddy.conf from each repo (if exists)
+- Delete caddy-subdomain.conf from each repo (if exists)
+- Update app-template to not include Caddy configs
+- Update app-template CLAUDE.md to remove Caddy references
+- Commit changes
+- Note: Apps will temporarily break until deploy service is ready
+
+**Acceptance Criteria:**
+- No Caddy config files in app repos
+- App-template doesn't include Caddy configs
+- Ready for deploy-service-generated configs
+
+**Dependencies:** Add showOnDoughHughesNet to App JSONs
+
+---
+
+# Epic 3: Port Management & Environment Configuration
 
 **Goal:** Enable apps to run on configurable ports for parallel development.
 
-### TICKET-007: Add PORT Environment Variable Support to App Template
+**Estimated Time:** ~3 hours
+
+---
+
+## Add PORT Environment Variable Support to App Template
 **Priority:** P0
 **Estimate:** 30 minutes
 
@@ -210,17 +326,18 @@ Update app-template to read port from environment variable. Apps no longer have 
 - Update `app.py` to read: `PORT = int(os.getenv('PORT', 8000))`
 - Update README/CLAUDE.md to explain PORT is set by systemd service
 - Note: Port is provided by deploy service, not configured by developer
+- Remove any hardcoded port references
 
 **Acceptance Criteria:**
 - App reads PORT from environment
 - Falls back to 8000 if not set (for local dev)
 - Documentation explains PORT is deployment-managed
 
-**Dependencies:** TICKET-005
+**Dependencies:** Remove Caddy Configs from App Repos
 
 ---
 
-### TICKET-008: Add PORT Support to Existing Apps
+## Add PORT Support to Existing Apps
 **Priority:** P0
 **Estimate:** 2 hours
 
@@ -247,11 +364,11 @@ Update all existing apps to support PORT environment variable. After migration, 
 - Can run app on different port locally for worktree development
 - Production apps continue working on existing ports
 
-**Dependencies:** TICKET-007
+**Dependencies:** Add PORT Environment Variable Support to App Template
 
 ---
 
-### TICKET-009: Initialize Port Allocation Tracking
+## Initialize Port Allocation Tracking
 **Priority:** P0
 **Estimate:** 30 minutes
 
@@ -282,15 +399,19 @@ Create initial port allocation file with existing production deployments. All fu
 - Documentation explains dynamic allocation
 - No manual port assignment needed for new deployments
 
-**Dependencies:** TICKET-008
+**Dependencies:** Add PORT Support to Existing Apps
 
 ---
 
-## Phase 3: Deploy Service Development
+# Epic 4: Deploy Service Development
 
-**Goal:** Create API service to handle preview deployments.
+**Goal:** Create API service to handle all deployments (production and preview).
 
-### TICKET-010: Create Deploy Service App Structure
+**Estimated Time:** ~13.5 hours
+
+---
+
+## Create Deploy Service App Structure
 **Priority:** P0
 **Estimate:** 2 hours
 
@@ -298,29 +419,31 @@ Create initial port allocation file with existing production deployments. All fu
 Set up deploy-service app with basic structure.
 
 **Tasks:**
-- Create `~/apps/deploy-service/` directory
+- Create app from app-template (new repo)
+- Rename to deploy-service
 - Create basic Flask/FastAPI app with endpoints:
   - POST /api/deploy (handles both production and preview)
   - POST /api/cleanup (preview only)
   - GET /api/status
   - GET /health
-- Add API key authentication
-- Create `deploy-service.service` (user service)
-- Create `caddy-subdomain.conf` for deploy.doughughes.net
+- Add API key authentication (Bearer token)
+- Update app.json: name="Deploy Service", showOnDoughHughesNet=false
 - Add basic logging
-- Note: Deploy service itself gets a port via manual allocation (bootstrap)
+- Set up to run on PORT from environment
+- Create GitHub workflows for CI/CD
+- Test locally
 
 **Acceptance Criteria:**
-- Service runs on dynamically allocated port
+- Service runs on PORT from environment
 - Endpoints return 200 OK with stub responses
 - API key authentication works
-- Accessible at deploy.doughughes.net (private)
+- Ready to be deployed via its own workflows
 
-**Dependencies:** TICKET-009
+**Dependencies:** Initialize Port Allocation Tracking
 
 ---
 
-### TICKET-011: Implement Port Allocation Logic
+## Implement Port Allocation Logic
 **Priority:** P0
 **Estimate:** 1.5 hours
 
@@ -347,11 +470,11 @@ Implement simple dynamic port allocation in deploy service. No ranges needed - j
 - Ports freed on cleanup
 - Works for both production and preview deployments
 
-**Dependencies:** TICKET-010
+**Dependencies:** Create Deploy Service App Structure
 
 ---
 
-### TICKET-012: Implement Unified Deploy Endpoint
+## Implement Unified Deploy Endpoint
 **Priority:** P0
 **Estimate:** 5 hours
 
@@ -373,16 +496,16 @@ Implement POST /api/deploy endpoint that handles both production and preview dep
 - Validate inputs and authenticate API key
 - Calculate deployment_id: `{app}` (prod) or `{app}-pr-{number}` (preview)
 - Calculate subdomain: `{app}.doughughes.net` (prod) or `pr-{number}.{app}.doughughes.net` (preview)
-- Check if deployment exists (git pull) or clone fresh
+- Check if deployment exists (git pull) or clone fresh to `~/apps/{deployment_id}`
 - Get or allocate port for this deployment_id
-- Generate systemd service file:
+- Generate systemd service file in `~/.config/systemd/user/`:
   - Name: `{deployment_id}.service`
   - WorkingDirectory: `~/apps/{deployment_id}`
   - Environment: PORT={allocated_port}
-- Generate `caddy-subdomain.conf`:
+- Generate `~/.config/caddy/{deployment_id}.caddy-subdomain.conf`:
   - Subdomain: calculated above
   - Reverse proxy to localhost:{port}
-  - Include forward_auth if app is private (parse from repo's config)
+- Special case for doughughes-net production: also generate catch-all `caddy.conf`
 - Install/update service: `systemctl --user enable {service}`
 - Restart service: `systemctl --user restart {service}`
 - Reload Caddy: `sudo caddy reload --config /etc/caddy/Caddyfile`
@@ -397,12 +520,13 @@ Implement POST /api/deploy endpoint that handles both production and preview dep
 - Returns correct URL
 - Handles errors gracefully (cleanup on failure)
 - Works for brand new apps (zero manual setup)
+- doughughes-net gets catch-all config when deployed to production
 
-**Dependencies:** TICKET-011
+**Dependencies:** Implement Port Allocation Logic
 
 ---
 
-### TICKET-013: Implement Cleanup Endpoint
+## Implement Cleanup Endpoint
 **Priority:** P0
 **Estimate:** 2 hours
 
@@ -425,6 +549,7 @@ Implement POST /api/cleanup endpoint for tearing down preview deployments. Produ
 - Disable service: `systemctl --user disable {deployment_id}`
 - Remove service file from `~/.config/systemd/user/`
 - Remove app directory: `~/apps/{deployment_id}`
+- Remove Caddy config: `~/.config/caddy/{deployment_id}.caddy-subdomain.conf`
 - Free port in ports.json
 - Reload Caddy: `sudo caddy reload --config /etc/caddy/Caddyfile`
 - Return success response
@@ -433,15 +558,16 @@ Implement POST /api/cleanup endpoint for tearing down preview deployments. Produ
 - Rejects cleanup requests without pr_number (production protection)
 - Service is stopped and removed
 - Directory is deleted
+- Caddy config removed
 - Port is freed
 - Subdomain no longer accessible (404)
 - Idempotent (can call multiple times safely)
 
-**Dependencies:** TICKET-012
+**Dependencies:** Implement Unified Deploy Endpoint
 
 ---
 
-### TICKET-014: Implement Status Endpoint
+## Implement Status Endpoint
 **Priority:** P1
 **Estimate:** 1 hour
 
@@ -490,11 +616,11 @@ Implement GET /api/status endpoint showing all deployments (production and previ
 - Next available port shown
 - Useful for debugging and monitoring
 
-**Dependencies:** TICKET-013
+**Dependencies:** Implement Cleanup Endpoint
 
 ---
 
-### TICKET-015: Deploy Service Testing & Hardening
+## Deploy Service Testing & Hardening
 **Priority:** P0
 **Estimate:** 3 hours
 
@@ -504,35 +630,45 @@ Comprehensive testing and error handling for deploy service.
 **Test scenarios:**
 - Deploy to non-existent repo
 - Deploy with invalid branch
-- Deploy when port range exhausted
+- Deploy when all ports below 10000 are taken
 - Cleanup non-existent preview
 - Concurrent deploys to same app
 - Concurrent deploys to different apps
 - Invalid API key
 - Malformed requests
+- Deploy doughughes-net (verify catch-all config generated)
+- Deploy new app that doesn't exist yet
 
 **Tasks:**
 - Add comprehensive error handling
 - Add request validation
 - Add detailed logging
 - Test all failure scenarios
-- Document API in README
+- Test doughughes-net special case
+- Test brand new app deployment
+- Document API in deploy-service README
 
 **Acceptance Criteria:**
 - All error scenarios handled gracefully
 - Clear error messages returned
 - No partial deployments on failure
+- doughughes-net special handling works
+- New apps deploy successfully
 - API documentation complete
 
-**Dependencies:** TICKET-014
+**Dependencies:** Implement Status Endpoint
 
 ---
 
-## Phase 4: GitHub Actions Integration
+# Epic 5: GitHub Actions Integration
 
-**Goal:** Automate preview deployments via GitHub workflows.
+**Goal:** Automate deployments via GitHub workflows.
 
-### TICKET-016: Create Preview Deploy Workflow Template
+**Estimated Time:** ~7.5 hours
+
+---
+
+## Create Preview Deploy Workflow Template
 **Priority:** P0
 **Estimate:** 2 hours
 
@@ -581,11 +717,11 @@ jobs:
 - API key secure in secrets
 - Works for any app without customization
 
-**Dependencies:** TICKET-015
+**Dependencies:** Deploy Service Testing & Hardening
 
 ---
 
-### TICKET-017: Create Production Deploy Workflow Template
+## Create Production Deploy Workflow Template
 **Priority:** P0
 **Estimate:** 1.5 hours
 
@@ -633,11 +769,11 @@ jobs:
 - Works for brand new apps (first merge creates production)
 - Uses same API endpoint as preview (unified logic)
 
-**Dependencies:** TICKET-016
+**Dependencies:** Create Preview Deploy Workflow Template
 
 ---
 
-### TICKET-018: Create Cleanup Workflow Template
+## Create Cleanup Workflow Template
 **Priority:** P0
 **Estimate:** 1 hour
 
@@ -660,7 +796,7 @@ jobs:
       - pr_number: ${{ github.event.pull_request.number }}
     - Removes preview deployment (pr-{number}.{app}.doughughes.net)
 
-Note: If PR was merged, production already deployed via TICKET-017 workflow.
+Note: If PR was merged, production already deployed via production workflow.
 This just cleans up the preview instance.
 ```
 
@@ -674,15 +810,15 @@ This just cleans up the preview instance.
 
 **Acceptance Criteria:**
 - Triggers when PR closed (merged or not)
-- Calls cleanup endpoint
-- Preview is torn down
+- Calls cleanup endpoint correctly
 - Works for merged and abandoned PRs
+- Idempotent (safe to call multiple times)
 
-**Dependencies:** TICKET-017
+**Dependencies:** Create Production Deploy Workflow Template
 
 ---
 
-### TICKET-019: Add GitHub Workflows to App Template
+## Add GitHub Workflows to App Template
 **Priority:** P0
 **Estimate:** 1 hour
 
@@ -690,29 +826,79 @@ This just cleans up the preview instance.
 Integrate all workflows into app-template with documentation.
 
 **Tasks:**
-- Add all three workflow files
-- Update app-template CLAUDE.md with:
-  - GitHub secrets setup instructions
+- Add all three workflow files to app-template
+- Update app-template README.md with:
+  - How preview deployments work
+  - GitHub secrets setup instructions (DEPLOY_API_KEY)
   - Workflow explanations
-  - How to customize for specific apps
-- Create example .env.example for required secrets
+  - How to customize for specific test frameworks
+- Update app-template CLAUDE.md:
+  - Explain automated deployment
+  - Document workflow structure
+  - Note that no manual deployment is needed
+- Create example test files if not already present
 - Test creating new app from template
 
 **Acceptance Criteria:**
-- Template includes all workflows
-- Documentation is clear
+- Template includes all three workflows
+- Documentation is clear and comprehensive
 - New apps have working CI/CD out of box
 - Secrets documented
+- Ready for actual use
 
-**Dependencies:** TICKET-018
+**Dependencies:** Create Cleanup Workflow Template
 
 ---
 
-## Phase 5: App Migration & Rollout
+# Epic 6: Bootstrap Deploy Service
 
-**Goal:** Roll out preview deployments to existing apps.
+**Goal:** Deploy the deploy-service itself (chicken-and-egg problem).
 
-### TICKET-020: Add GitHub Workflows to color-the-map (Pilot)
+**Estimated Time:** ~2 hours
+
+---
+
+## Bootstrap Deploy Service to Production
+**Priority:** P0
+**Estimate:** 2 hours
+
+**Description:**
+Manually deploy the deploy-service app to the server since it can't deploy itself initially.
+
+**Tasks:**
+- Clone deploy-service repo to `~/apps/deploy-service` on server
+- Manually allocate port (next available, likely 8006)
+- Add to ports.json: `"deploy-service": 8006`
+- Create systemd service manually in `~/.config/systemd/user/`
+- Create Caddy config manually in `~/.config/caddy/deploy-service.caddy-subdomain.conf`
+- Enable and start service: `systemctl --user enable deploy-service && systemctl --user start deploy-service`
+- Reload Caddy
+- Verify accessible at deploy.doughughes.net
+- Test API endpoints work
+- Generate and save DEPLOY_API_KEY
+- Add DEPLOY_API_KEY to deploy-service repo secrets in GitHub
+
+**Acceptance Criteria:**
+- Deploy service running and accessible at deploy.doughughes.net
+- API endpoints respond correctly
+- API key authentication works
+- Can make test deployment
+- Deploy service itself has GitHub workflows
+- Future updates to deploy-service deploy via GitHub Actions
+
+**Dependencies:** Add GitHub Workflows to App Template
+
+---
+
+# Epic 7: App Migration & Rollout
+
+**Goal:** Roll out preview deployments to all existing apps.
+
+**Estimated Time:** ~9-13 hours
+
+---
+
+## Add GitHub Workflows to color-the-map (Pilot)
 **Priority:** P0
 **Estimate:** 2 hours
 
@@ -721,8 +907,8 @@ Add preview deployment workflows to color-the-map as pilot project.
 
 **Tasks:**
 - Copy workflows from app-template
-- Customize for color-the-map specifics
-- Add GitHub secrets (API key, SSH key if needed)
+- Customize for color-the-map specifics (test commands, etc.)
+- Add DEPLOY_API_KEY to GitHub repo secrets
 - Create test PR to trigger preview deploy
 - Verify preview URL works
 - Test merge (production deploy)
@@ -736,11 +922,11 @@ Add preview deployment workflows to color-the-map as pilot project.
 - Preview cleaned up on close/merge
 - Full cycle tested end-to-end
 
-**Dependencies:** TICKET-019
+**Dependencies:** Bootstrap Deploy Service to Production
 
 ---
 
-### TICKET-021: Fix Issues from Pilot (if any)
+## Fix Issues from Pilot
 **Priority:** P0
 **Estimate:** 2-4 hours (contingency)
 
@@ -759,11 +945,11 @@ Address any issues discovered during color-the-map pilot.
 - Workflows robust and reliable
 - Ready for broader rollout
 
-**Dependencies:** TICKET-020
+**Dependencies:** Add GitHub Workflows to color-the-map (Pilot)
 
 ---
 
-### TICKET-022: Add Workflows to home-inventory
+## Add Workflows to home-inventory
 **Priority:** P1
 **Estimate:** 1 hour
 
@@ -771,8 +957,9 @@ Address any issues discovered during color-the-map pilot.
 Roll out preview deployments to home-inventory.
 
 **Tasks:**
-- Copy workflows
-- Add secrets
+- Copy workflows from app-template
+- Customize test commands if needed
+- Add DEPLOY_API_KEY to repo secrets
 - Test preview deployment
 - Document any app-specific customizations
 
@@ -780,11 +967,11 @@ Roll out preview deployments to home-inventory.
 - Full preview deployment cycle works
 - No issues during testing
 
-**Dependencies:** TICKET-021
+**Dependencies:** Fix Issues from Pilot
 
 ---
 
-### TICKET-023: Add Workflows to Remaining Apps
+## Add Workflows to Remaining Apps
 **Priority:** P1
 **Estimate:** 3 hours
 
@@ -793,23 +980,26 @@ Roll out to remaining apps:
 - cranium-charades
 - random-word
 - lottery-numbers
+- doughughes-net (yes, even the homepage uses the system!)
 
 **Tasks:**
 - For each app:
-  - Copy workflows
-  - Add secrets
-  - Test cycle
+  - Copy workflows from app-template
+  - Add DEPLOY_API_KEY to repo secrets
+  - Test deployment cycle
+  - Verify doughughes-net gets catch-all config when deployed
   - Document customizations
 
 **Acceptance Criteria:**
 - All apps have preview deployments
 - All tested successfully
+- doughughes-net deploys correctly with catch-all handler
 
-**Dependencies:** TICKET-022
+**Dependencies:** Add Workflows to home-inventory
 
 ---
 
-### TICKET-024: Remove Legacy Deploy Scripts from Apps
+## Remove Legacy Deploy Scripts from Apps
 **Priority:** P1
 **Estimate:** 1 hour
 
@@ -826,9 +1016,9 @@ Remove deploy.sh and deploy-to-prod.sh scripts from all apps now that GitHub Act
 
 **Tasks:**
 - For each app:
-  - Delete `deploy.sh` (on server and in repo)
-  - Delete `deploy-to-prod.sh` (local only, in repo)
-  - Commit changes
+  - Delete `deploy.sh`
+  - Delete `deploy-to-prod.sh`
+  - Commit changes with message explaining GitHub Actions replacement
 - Update app-template to not include deploy scripts
 - Update app-template CLAUDE.md to remove deploy script references
 - Document GitHub Actions as the only deployment method
@@ -839,15 +1029,19 @@ Remove deploy.sh and deploy-to-prod.sh scripts from all apps now that GitHub Act
 - Documentation updated
 - Deployment only happens via GitHub Actions
 
-**Dependencies:** TICKET-023
+**Dependencies:** Add Workflows to Remaining Apps
 
 ---
 
-## Phase 6: Documentation & Polish
+# Epic 8: Documentation & Polish
 
 **Goal:** Complete documentation and add nice-to-have features.
 
-### TICKET-025: Update Main Infrastructure Docs
+**Estimated Time:** ~3-6 hours
+
+---
+
+## Update Main Infrastructure Docs
 **Priority:** P1
 **Estimate:** 1.5 hours
 
@@ -855,18 +1049,20 @@ Remove deploy.sh and deploy-to-prod.sh scripts from all apps now that GitHub Act
 Update all infrastructure documentation to reflect the final minimal state of the infrastructure repo and document the preview deployment system.
 
 **Files to update:**
-- README.md
-- CLAUDE.md
-- docs/README.md
+- ~/infrastructure/README.md
+- ~/infrastructure/CLAUDE.md
+- ~/infrastructure/docs/README.md
 
 **Tasks:**
 - Document what remains in infrastructure repo (just Caddy glue and docs)
-- Add preview deployment section
-- Update architecture diagrams (deploy service, GitHub Actions)
+- Update Caddyfile to import from ~/.config/caddy/ instead of ~/apps/
+- Add preview deployment system overview
+- Update architecture diagrams (deploy service, GitHub Actions, no auth)
 - Explain that apps are now deployed via GitHub Actions only
 - Document doughughes-net's special role (catch-all handler)
-- Update deployment commands (only Caddy deploy remains)
+- Update deployment commands (only Caddy deploy remains in infrastructure)
 - Link to preview deployment vision docs
+- Document showOnDoughHughesNet field in app.json
 
 **Acceptance Criteria:**
 - Clear what infrastructure repo contains (minimal)
@@ -874,12 +1070,13 @@ Update all infrastructure documentation to reflect the final minimal state of th
 - Easy to discover preview deployment info
 - Architecture diagrams updated
 - No references to per-app deploy scripts
+- showOnDoughHughesNet field documented
 
-**Dependencies:** TICKET-024
+**Dependencies:** Remove Legacy Deploy Scripts from Apps
 
 ---
 
-### TICKET-026: Add Deploy Service Monitoring (Optional)
+## Add Deploy Service Monitoring (Optional)
 **Priority:** P2
 **Estimate:** 3 hours
 
@@ -887,27 +1084,29 @@ Update all infrastructure documentation to reflect the final minimal state of th
 Basic monitoring and dashboard for deploy service.
 
 **Features:**
-- Simple web dashboard showing active previews
+- Simple web dashboard showing active deployments
 - Service health status
 - Port utilization
 - Recent deployment activity
+- Distinguish production vs preview
 
 **Tasks:**
-- Add web UI to deploy service
-- Show active previews table
-- Display port usage charts
+- Add web UI to deploy service (simple HTML page)
+- Show active deployments table (production and preview)
+- Display port usage
 - Add activity log
+- Link from doughughes-net homepage (admin/debug link)
 
 **Acceptance Criteria:**
 - Dashboard accessible at deploy.doughughes.net
 - Shows useful info
 - Helps with debugging
 
-**Dependencies:** TICKET-025
+**Dependencies:** Update Main Infrastructure Docs
 
 ---
 
-### TICKET-027: Add Auto-Cleanup for Stale Previews (Optional)
+## Add Auto-Cleanup for Stale Previews (Optional)
 **Priority:** P3
 **Estimate:** 2 hours
 
@@ -915,57 +1114,61 @@ Basic monitoring and dashboard for deploy service.
 Automatically cleanup preview deployments older than 30 days.
 
 **Tasks:**
-- Add created_at timestamp to preview tracking
-- Create cleanup cron job
+- Add created_at timestamp to deployment tracking
+- Create cleanup cron job or scheduled task in deploy service
 - Identify previews >30 days old
 - Call cleanup endpoint for each
 - Log cleanup actions
+- Make threshold configurable
 
 **Acceptance Criteria:**
 - Stale previews auto-cleaned
 - Configurable age threshold
-- Runs daily via cron
+- Runs daily
+- Logs actions taken
 
-**Dependencies:** TICKET-025
+**Dependencies:** Update Main Infrastructure Docs
 
 ---
 
 ## Summary
 
-**Total Estimated Time:** 44-55 hours (27 tickets)
+**Total Tickets:** 30
+**Total Estimated Time:** 46-59 hours
 
 **Phase Breakdown:**
-- Phase 1 (Foundation): ~8 hours
-- Phase 2 (Port Management): ~3 hours (simplified - dynamic allocation)
-- Phase 3 (Deploy Service): ~13.5 hours (unified deploy endpoint)
-- Phase 4 (GitHub Actions): ~7.5 hours (unified workflows)
-- Phase 5 (Migration): ~9-13 hours (includes script cleanup)
-- Phase 6 (Docs & Polish): ~3-6 hours (2 optional tickets)
-
-**Key Simplifications from Original Plan:**
-- No per-app port ranges (dynamic allocation only)
-- Unified deploy endpoint (production and preview use same logic)
-- Zero server setup for new apps (automatic allocation)
+- Epic 1 (User Systemd): ~8 hours (6 tickets)
+- Epic 2 (Simplification): ~3.5 hours (3 tickets)
+- Epic 3 (Port Management): ~3 hours (3 tickets)
+- Epic 4 (Deploy Service): ~13.5 hours (5 tickets)
+- Epic 5 (GitHub Actions): ~7.5 hours (4 tickets)
+- Epic 6 (Bootstrap): ~2 hours (1 ticket)
+- Epic 7 (Migration): ~9-13 hours (5 tickets)
+- Epic 8 (Documentation): ~3-6 hours (3 tickets, 2 optional)
 
 **Critical Path:**
-TICKET-001 → 002 → 003 → 004 → 007 → 008 → 009 → 010 → 011 → 012 → 013 → 015 → 016 → 017 → 018 → 019 → 020 → 021 → 022 → 023 → 024 → 025
+Server Setup → Migration Script → Migrate doughughes-net → Migrate All Apps → Update Template → Remove Auth → Add showOnDoughHughesNet → Remove Caddy Configs → Add PORT to Template → Add PORT to Apps → Initialize Ports → Create Deploy Service → Port Allocation → Deploy Endpoint → Cleanup Endpoint → Testing → Preview Workflow → Production Workflow → Cleanup Workflow → Add to Template → Bootstrap Deploy Service → Pilot → Fix Issues → Rollout Apps → Remove Scripts → Update Docs
 
 **Parallelization Opportunities:**
-- TICKET-005 and 006 can happen during/after TICKET-004
-- TICKET-022 and 023 can happen in parallel
-- Phase 6 tickets can happen in any order
+- Update App Template and Update Infrastructure Docs can happen after Migrate All Apps
+- Add Workflows to different apps can happen in parallel (home-inventory and remaining apps)
+- Documentation tickets can happen in any order
 
 **Risk Areas:**
-- TICKET-015: Deploy service testing critical
-- TICKET-020: Pilot may reveal unforeseen issues
-- TICKET-021: Contingency for pilot issues
+- Deploy Service Testing critical (TICKET-015 equivalent)
+- Pilot may reveal unforeseen issues (color-the-map)
+- Bootstrap deploy-service is chicken-and-egg (manual first deploy)
+- doughughes-net special case for catch-all routing
 
 **Success Criteria:**
 - ✅ All apps migrated to user services
+- ✅ No centralized authentication (apps handle their own)
 - ✅ Deploy service running and tested
+- ✅ All Caddy/systemd configs generated dynamically
 - ✅ Preview deployments work end-to-end
 - ✅ Production deployments work via same endpoint
 - ✅ GitHub Actions integrated
 - ✅ App template ready for new apps
 - ✅ New apps can be created and deployed with zero server setup
 - ✅ Documentation complete
+- ✅ Infrastructure repo is minimal (just Caddy glue + docs)

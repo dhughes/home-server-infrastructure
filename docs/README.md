@@ -93,7 +93,7 @@ Note: User guide is embedded in app-template workflows and README, not a separat
 
 ## Estimated Timeline
 
-**Total Time:** 44-55 hours (27 tickets)
+**Total Time:** 46-59 hours (30 tickets across 8 epics)
 **Critical Path:** ~35-40 hours
 **Optional Features:** ~5 hours
 
