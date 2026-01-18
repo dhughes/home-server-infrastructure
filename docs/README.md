@@ -22,17 +22,6 @@ This directory contains planning and implementation documentation for the Previe
 - GitHub Actions workflow
 - Benefits and trade-offs
 
-### preview-deployment-project-plan.md
-**When to read:** During implementation
-**Purpose:** Detailed step-by-step implementation plan
-**Contains:**
-- 27 detailed tickets across 6 phases
-- Acceptance criteria for each ticket
-- Time estimates
-- Dependencies between tickets
-- Risk areas and mitigation
-
-
 ## Project Phases
 
 ### Phase 1: Foundation - User Systemd Migration
@@ -104,7 +93,7 @@ Note: User guide is embedded in app-template workflows and README, not a separat
 
 ## Estimated Timeline
 
-**Total Time:** 43-54 hours (26 tickets)
+**Total Time:** 44-55 hours (27 tickets)
 **Critical Path:** ~35-40 hours
 **Optional Features:** ~5 hours
 

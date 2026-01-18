@@ -4,7 +4,7 @@
 
 Transform home server infrastructure to support parallel development with automatic preview deployments for pull requests.
 
-**Estimated Total Tickets:** 26
+**Estimated Total Tickets:** 27
 **Phases:** 6
 
 ## Key Architectural Decisions
@@ -809,38 +809,77 @@ Roll out to remaining apps:
 
 ---
 
-## Phase 6: Documentation & Polish
-
-**Goal:** Complete documentation and add nice-to-have features.
-
-### TICKET-024: Update Main Infrastructure Docs
+### TICKET-024: Remove Legacy Deploy Scripts from Apps
 **Priority:** P1
 **Estimate:** 1 hour
 
 **Description:**
-Update all infrastructure documentation with preview deployment info.
+Remove deploy.sh and deploy-to-prod.sh scripts from all apps now that GitHub Actions handles deployment.
 
-**Files to update:**
-- README.md
-- CLAUDE.md
-- Add links to preview deployment docs
+**Apps to update:**
+- color-the-map
+- home-inventory
+- cranium-charades
+- random-word
+- lottery-numbers
+- doughughes-net
 
 **Tasks:**
-- Add preview deployment section
-- Update architecture diagrams
-- Link to detailed docs
-- Update port allocation info
+- For each app:
+  - Delete `deploy.sh` (on server and in repo)
+  - Delete `deploy-to-prod.sh` (local only, in repo)
+  - Commit changes
+- Update app-template to not include deploy scripts
+- Update app-template CLAUDE.md to remove deploy script references
+- Document GitHub Actions as the only deployment method
 
 **Acceptance Criteria:**
-- Docs reflect new capabilities
-- Easy to discover preview deployment info
-- Architecture clear
+- All legacy deploy scripts removed from app repos
+- App-template doesn't include deploy scripts
+- Documentation updated
+- Deployment only happens via GitHub Actions
 
 **Dependencies:** TICKET-023
 
 ---
 
-### TICKET-025: Add Deploy Service Monitoring (Optional)
+## Phase 6: Documentation & Polish
+
+**Goal:** Complete documentation and add nice-to-have features.
+
+### TICKET-025: Update Main Infrastructure Docs
+**Priority:** P1
+**Estimate:** 1.5 hours
+
+**Description:**
+Update all infrastructure documentation to reflect the final minimal state of the infrastructure repo and document the preview deployment system.
+
+**Files to update:**
+- README.md
+- CLAUDE.md
+- docs/README.md
+
+**Tasks:**
+- Document what remains in infrastructure repo (just Caddy glue and docs)
+- Add preview deployment section
+- Update architecture diagrams (deploy service, GitHub Actions)
+- Explain that apps are now deployed via GitHub Actions only
+- Document doughughes-net's special role (catch-all handler)
+- Update deployment commands (only Caddy deploy remains)
+- Link to preview deployment vision docs
+
+**Acceptance Criteria:**
+- Clear what infrastructure repo contains (minimal)
+- Docs reflect GitHub Actions as only deployment method
+- Easy to discover preview deployment info
+- Architecture diagrams updated
+- No references to per-app deploy scripts
+
+**Dependencies:** TICKET-024
+
+---
+
+### TICKET-026: Add Deploy Service Monitoring (Optional)
 **Priority:** P2
 **Estimate:** 3 hours
 
@@ -864,11 +903,11 @@ Basic monitoring and dashboard for deploy service.
 - Shows useful info
 - Helps with debugging
 
-**Dependencies:** TICKET-023
+**Dependencies:** TICKET-025
 
 ---
 
-### TICKET-026: Add Auto-Cleanup for Stale Previews (Optional)
+### TICKET-027: Add Auto-Cleanup for Stale Previews (Optional)
 **Priority:** P3
 **Estimate:** 2 hours
 
@@ -887,20 +926,20 @@ Automatically cleanup preview deployments older than 30 days.
 - Configurable age threshold
 - Runs daily via cron
 
-**Dependencies:** TICKET-023
+**Dependencies:** TICKET-025
 
 ---
 
 ## Summary
 
-**Total Estimated Time:** 43-54 hours (26 tickets)
+**Total Estimated Time:** 44-55 hours (27 tickets)
 
 **Phase Breakdown:**
 - Phase 1 (Foundation): ~8 hours
 - Phase 2 (Port Management): ~3 hours (simplified - dynamic allocation)
 - Phase 3 (Deploy Service): ~13.5 hours (unified deploy endpoint)
 - Phase 4 (GitHub Actions): ~7.5 hours (unified workflows)
-- Phase 5 (Migration): ~8-12 hours
+- Phase 5 (Migration): ~9-13 hours (includes script cleanup)
 - Phase 6 (Docs & Polish): ~3-6 hours (2 optional tickets)
 
 **Key Simplifications from Original Plan:**
@@ -909,7 +948,7 @@ Automatically cleanup preview deployments older than 30 days.
 - Zero server setup for new apps (automatic allocation)
 
 **Critical Path:**
-TICKET-001 → 002 → 003 → 004 → 007 → 008 → 009 → 010 → 011 → 012 → 013 → 015 → 016 → 017 → 018 → 019 → 020 → 021 → 024
+TICKET-001 → 002 → 003 → 004 → 007 → 008 → 009 → 010 → 011 → 012 → 013 → 015 → 016 → 017 → 018 → 019 → 020 → 021 → 022 → 023 → 024 → 025
 
 **Parallelization Opportunities:**
 - TICKET-005 and 006 can happen during/after TICKET-004
