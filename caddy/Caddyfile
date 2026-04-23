@@ -1,7 +1,7 @@
 # Import subdomain configurations at top level
 import /home/dhughes/apps/*/caddy-subdomain.conf
 
-doughughes.net, www.doughughes.net {
+doughughes.net, www.doughughes.net, dougco.dev, www.dougco.dev {
 	# Import all app configurations
 	# This includes the doughughes-net app which provides the catch-all handler
 	import /home/dhughes/apps/*/caddy.conf

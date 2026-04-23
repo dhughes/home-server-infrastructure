@@ -29,6 +29,13 @@ sudo systemctl restart <service>                    # Restart a single service
 | Changed doughughes-net code | `sudo ./deploy.sh auth` (restarts doughughes-net) |
 | Changed an app's code | `sudo systemctl restart <app-name>` |
 
+## Server
+
+- **Hostname**: old-mbp
+- **OS**: Ubuntu 25.10 (Questing Quokka)
+- **Arch**: x86_64
+- **User**: dhughes
+
 ## Architecture
 
 ```
@@ -146,10 +153,36 @@ Updates Cloudflare DNS when public IP changes.
 | 22 | SSH | Yes (via ssh.doughughes.net) |
 | 80 | Caddy (HTTP → HTTPS redirect) | Yes |
 | 443 | Caddy (HTTPS) | Yes |
+| 5432 | PostgreSQL | No (localhost only) |
 | 8000 | doughughes-net | No (internal) |
 | 8001+ | Apps | No (internal) |
 
 Check existing `~/apps/*/caddy-subdomain.conf` files for used ports before assigning a new one.
+
+## PostgreSQL
+
+PostgreSQL 18.2 with PostGIS 3.6.2 installed from the official PGDG apt repository.
+
+- **Data directory**: `/var/lib/postgresql/18/main`
+- **Config directory**: `/etc/postgresql/18/main/`
+- **Auth**: peer (local), scram-sha-256 (host)
+- **Encoding**: UTF8
+- **Timezone**: America/New_York
+- **Listening on**: localhost only (not exposed to network)
+- **Apt source**: `/etc/apt/sources.list.d/pgdg.list` (apt.postgresql.org, questing-pgdg)
+
+**Databases:**
+
+| Database | Owner | Extensions | Used By |
+|----------|-------|------------|---------|
+| color_the_map | colormap | postgis | color-the-map app |
+
+```bash
+sudo systemctl status postgresql          # Check status
+sudo -u postgres psql                      # Connect as superuser
+sudo -u postgres psql -l                   # List databases
+psql -h localhost -U colormap -d color_the_map  # Connect as app user
+```
 
 ## Firewall (ufw)
 
