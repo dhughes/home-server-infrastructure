@@ -69,6 +69,26 @@ rightcontrol = rightmeta
 
 Then: `sudo systemctl enable keyd && sudo systemctl start keyd`
 
+### T2 MacBook Pro quirks (only if hardware is a 2018+ Intel Mac)
+
+Two persistent workarounds the current `old-mbp` server depends on. If you're rebuilding on the same hardware (or any T2 Mac), apply both. If you're on different hardware, skip this section.
+
+**External USB-C storage requires a kernel parameter.** Without `pcie_ports=native`, the JHL7540 Thunderbolt controllers silently drop USB devices. Edit `/etc/default/grub`, change:
+
+```
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
+```
+
+to:
+
+```
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash pcie_ports=native"
+```
+
+Then `sudo update-grub && sudo reboot`. After this, plugging a USB-C device produces normal kernel attach events and `lsblk` shows it. The backup drive setup in `docs/backup-drive.md` depends on this.
+
+**`sudo reboot` doesn't actually reboot.** Use `sudo systemctl reboot -ff` instead. Plain `sudo reboot` hangs in systemd userland teardown — different `reboot=` kernel parameter values (`pci`, `efi`, `triple,force`) don't help because the hang happens before the kernel reset is attempted. `-ff` skips userland and calls the reboot syscall directly. Services don't get a graceful stop; the trade-off is acceptable for this server's workload (Postgres is crash-safe, apps are stateless, filesystems are journaled).
+
 ## Step 3: Network and DNS
 
 ### Static IP (Router)
@@ -350,18 +370,22 @@ Each app in `~/apps/<app-name>/` needs an `app.json` file:
 
 ## Backup Considerations
 
-**What to back up:**
+**Backup target hardware**: a LUKS-encrypted external SSD is attached to the server, mounted at `/mnt/backup`, auto-unlocked at boot via crypttab. Setup details — including the LUKS keyfile location, recovery passphrase reference (1Password: `Sandisk Backup SSD LUKS passphrase`), and re-setup procedure — live in [`docs/backup-drive.md`](docs/backup-drive.md). The backup *drive* is set up; the backup *jobs* (what runs, when, retention, offsite copy, restore testing) are tracked in `color-the-map` issue #487 and are still TODO at the time of writing.
+
+**What to back up (when backup jobs are wired up):**
 - `~/infrastructure/` (git repo, push to remote)
 - `~/apps/*/` (git repos, push to remotes)
 - `~/apps/doughughes-net/users.json` (user credentials - NOT in git)
 - `~/apps/doughughes-net/sessions.json` (active sessions - NOT in git)
 - `/etc/ddclient.conf` (contains API token)
+- `pg_dump` of every PostgreSQL DB (excluding the `osm` schema in `color_the_map` — it's huge and regenerable from OSM source)
 
 **What doesn't need backup:**
 - Session files (users just re-login)
 - SSL certificates (Caddy regenerates them)
 - Generated Caddyfile (regenerated from app.json on deploy)
 - System packages (reinstall from apt)
+- The `osm` schema in the `color_the_map` PostgreSQL DB (regenerable; see `color-the-map` repo for the import procedure)
 
 ## Troubleshooting
 

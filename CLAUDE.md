@@ -35,6 +35,33 @@ sudo systemctl restart <service>                    # Restart a single service
 - **OS**: Ubuntu 25.10 (Questing Quokka)
 - **Arch**: x86_64
 - **User**: dhughes
+- **Hardware**: 2019 16" MacBook Pro (`MacBookPro16,1`, T2 chip) — see "Hardware quirks" below
+- **Backup drive**: SanDisk Extreme 1 TB attached via USB-C, LUKS-encrypted, mounted at `/mnt/backup`. Setup details in [`docs/backup-drive.md`](docs/backup-drive.md).
+
+## Hardware quirks (T2 MacBook Pro)
+
+This Mac model has two known Linux compatibility issues. Both are worked around; the workarounds are persistent (in GRUB config and operator habit), but anyone rebuilding this server or troubleshooting it for the first time will hit them.
+
+### External USB-C storage requires `pcie_ports=native`
+
+Without this kernel parameter, the JHL7540 Thunderbolt controllers fail to tunnel USB devices to the host. **Anything plugged into a USB-C port is silently ignored** — no `lsblk` entry, no `lsusb` entry, no `dmesg` event. Only Apple's internal devices (keyboard/trackpad/headset, routed through `apple_bce`) work.
+
+Already in `/etc/default/grub` as part of `GRUB_CMDLINE_LINUX_DEFAULT`. Boot logs may still show `thunderbolt: device links to tunneled native ports are missing!` even with the parameter set — that's cosmetic; the parameter changes the underlying PCIe handling so storage actually works.
+
+Documented at [t2linux wiki — state](https://wiki.t2linux.org/state/).
+
+### `sudo reboot` doesn't actually reboot — use `sudo systemctl reboot -ff`
+
+Plain `sudo reboot` (and `sudo shutdown -r`) hangs partway through systemd's shutdown sequence. The system either shuts down without restarting (requires power button to come back), or hangs entirely (requires holding power to force off). The `reboot=` kernel parameter doesn't help — `pci`, `efi`, and `triple,force` were all tested and fail the same way — because the hang is in **userland teardown**, before the kernel reset is even attempted.
+
+**Always use `sudo systemctl reboot -ff` to reboot this server.**
+
+`-ff` (double-force) tells systemd to skip its shutdown sequence and call the kernel `reboot()` syscall directly. Trade-off: services don't get a graceful stop. In practice that's tolerable here:
+- Postgres is crash-safe by design
+- App services (color-the-map etc.) are stateless from a shutdown perspective
+- Filesystems are journaled; the kernel calls `sync` before reset
+
+Future work: hunt down which systemd unit/module hangs during normal shutdown so `sudo reboot` works again. Suspects: `apple_bce` / `thunderbolt` / `apple_ib_tb` modules during teardown (a similar problem exists for suspend on this hardware). Not urgent.
 
 ## Architecture
 
