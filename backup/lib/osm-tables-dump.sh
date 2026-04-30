@@ -1,8 +1,9 @@
 #!/bin/bash
 # shellcheck disable=SC2024
-# (SC2024: redirect on `sudo -u postgres pg_dump ... -f file` is fine — we
-# pass an output path with -f rather than shell redirect, but documenting
-# the disable for consistency with the other PG scripts that do redirect.)
+# (SC2024: redirect on `sudo -u postgres pg_dump ... > file` happens in
+# the calling shell, not under sudo. We run as root via cron, so root's
+# shell handles the redirect and has write access to $STAGING. The
+# postgres process inherits the open FD. Correct as-written.)
 #
 # Dump the app-facing tables of the osm schema for fast restore.
 #
@@ -55,7 +56,7 @@ $PG_SUDO pg_dump \
     --exclude-table=osm.planet_osm_rels \
     --format=custom \
     --compress="$COMPRESS" \
-    -f "$OUTPUT"
+    > "$OUTPUT"
 
 if [ ! -s "$OUTPUT" ]; then
     echo "ERROR: osm dump file is empty or missing: $OUTPUT" >&2
