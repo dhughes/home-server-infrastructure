@@ -1,0 +1,15 @@
+# Logrotate config for backup pipeline logs.
+# Source: ~/infrastructure/backup/etc/logrotate.d-backup
+# Installed at: /etc/logrotate.d/backup
+#
+# Validate after install with: sudo logrotate -d /etc/logrotate.d/backup
+
+/var/log/backup/*.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 root root
+}

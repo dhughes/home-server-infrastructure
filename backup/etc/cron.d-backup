@@ -1,0 +1,26 @@
+# Cron entries for the home-server backup pipeline.
+# Source of truth: ~/infrastructure/backup/etc/cron.d-backup
+# Installed at: /etc/cron.d/backup (cron picks up /etc/cron.d/* automatically;
+#   no daemon-reload needed)
+#
+# All entries run as root because the scripts read /root/.* credential files
+# and shell out to `sudo -u postgres` for Postgres operations.
+#
+# /etc/cron.d/ syntax requires a username field after the time spec
+# (unlike user crontabs).
+
+# Set a sane PATH (cron's default PATH is minimal and inconsistent).
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+SHELL=/bin/bash
+
+# Nightly backup at 1:15 AM (well outside the hourly OSM update window).
+15 1 * * * root /home/dhughes/infrastructure/backup/run-backup.sh >> /var/log/backup/run.log 2>&1
+
+# Weekly restic integrity check, Sunday 5 AM.
+0 5 * * 0 root /home/dhughes/infrastructure/backup/lib/restic-check.sh >> /var/log/backup/check.log 2>&1
+
+# Daily disk-space alert at 8:00 AM.
+0 8 * * * root /home/dhughes/infrastructure/backup/lib/disk-space-check.sh
+
+# Daily last-backup-time check at 8:05 AM.
+5 8 * * * root /home/dhughes/infrastructure/backup/lib/last-backup-check.sh

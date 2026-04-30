@@ -1,0 +1,26 @@
+# Restic exclude patterns for the wholesale ~/apps and ~/infrastructure backup.
+# See: https://restic.readthedocs.io/en/stable/040_backup.html#excluding-files
+#
+# Patterns match anywhere in the path. ** is a recursive wildcard.
+
+# Regenerable from package managers / build steps
+**/node_modules
+**/.venv
+**/venv
+**/__pycache__
+**/.pytest_cache
+**/.cache
+**/.next
+**/frontend/dist
+**/dist
+**/build
+**/.idea
+**/.DS_Store
+
+# Runtime state — not user data
+**/sessions.json
+
+# App-specific log files (system services log to journald, which has its
+# own retention; only home-inventory writes to a file, and it's slow-growing).
+# Excluded so we don't snapshot multi-MB log churn every night.
+**/server.log
