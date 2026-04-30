@@ -173,6 +173,25 @@ Updates Cloudflare DNS when public IP changes.
 - **Config**: `/etc/ddclient.conf`
 - **Updates**: doughughes.net, ssh.doughughes.net
 
+### Backup pipeline (cron, not systemd)
+
+Nightly encrypted backup of the server, driven by `restic` against the LUKS drive at `/mnt/backup`.
+
+- **Source code**: `~/infrastructure/backup/`
+- **Cron entries**: `/etc/cron.d/backup` (installed from `backup/etc/cron.d-backup`)
+- **What runs when**:
+  - 1:15 AM nightly — `run-backup.sh` (full backup)
+  - 5:00 AM Sunday — `lib/restic-check.sh` (weekly repo integrity check)
+  - 8:00 AM daily — `lib/disk-space-check.sh` (alert if `/mnt/backup` > 80%)
+  - 8:05 AM daily — `lib/last-backup-check.sh` (alert if no backup in 36h)
+- **Logs**: `/var/log/backup/run.log` and `/var/log/backup/check.log`, rotated by `/etc/logrotate.d/backup` (30-day retention)
+- **Notifications**: ntfy.sh push (per-failure content) + healthchecks.io watchdog (catches "script never ran")
+- **Credential files** (all 0600 root:root): `/root/.restic-password`, `/root/.ntfy-topic`, `/root/.healthchecks-url`
+- **Restic repo**: `/mnt/backup/restic-repo/`
+- **OSM bootstrap PBF**: `/mnt/backup/osm-bootstrap/planet-filtered-*.osm.pbf` (manually refreshed ~quarterly)
+
+Operational details in `backup/README.md`. CTM-specific OSM backup/restore procedures in `color-the-map/docs/backup-and-restore.md`.
+
 ## Port Assignments
 
 | Port | Service | Public |

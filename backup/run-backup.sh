@@ -123,10 +123,11 @@ log "Phase 3: SQLite snapshots"
 run_phase "Phase 3 (SQLite snapshots)" "$LIB_DIR/sqlite-snapshot.sh" "$STAGING"
 
 # ----------------------------------------------------------------------------
-# Phase 4: OSM checkpoint
+# Phase 4: OSM data (replication checkpoint + app-tables dump)
 # ----------------------------------------------------------------------------
-log "Phase 4: OSM checkpoint"
+log "Phase 4: OSM (checkpoint + tables dump)"
 run_phase "Phase 4 (OSM checkpoint)" "$LIB_DIR/osm-checkpoint.sh" "$STAGING"
+run_phase "Phase 4 (OSM tables dump)" "$LIB_DIR/osm-tables-dump.sh" "$STAGING"
 
 # ----------------------------------------------------------------------------
 # Phase 5: System metadata

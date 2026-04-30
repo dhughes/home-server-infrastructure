@@ -86,12 +86,25 @@ A few scripts respect env vars for local testing or one-off overrides:
 |--------|---------|---------|
 | `notify.sh` | `NTFY_TOPIC` | contents of `/root/.ntfy-topic` |
 | `pg-dump-all.sh` | `BACKUP_SKIP_DBS` | `color-the-map-osm-template` |
+| `pg-dump-all.sh` | `PG_SUDO` | `sudo -u postgres` |
 | `sqlite-snapshot.sh` | `APPS_ROOT` | `/home/dhughes/apps` |
 | `osm-checkpoint.sh` | `OSM_DB` | `color-the-map` |
+| `osm-tables-dump.sh` | `OSM_DB`, `OSM_DUMP_COMPRESS`, `PG_SUDO` | `color-the-map`, `3`, `sudo -u postgres` |
 | `disk-space-check.sh` | `THRESHOLD`, `MOUNT` | `80`, `/mnt/backup` |
 | `last-backup-check.sh` | `TS_FILE`, `THRESHOLD_SECONDS` | `/mnt/backup/last-backup-timestamp`, `129600` |
 
+## OSM-specific notes
+
+The OSM data has its own backup story because it's huge (~125 GB on disk) and structured differently from the application DBs:
+
+- **`osm-checkpoint.sh`** saves the replication sequence (~13 rows of `osm.osm2pgsql_properties`) so we know where to resume after restore.
+- **`osm-tables-dump.sh`** dumps the *app-facing* tables of the osm schema (`osm.highways`, `osm.admin_boundaries`, `osm.exclusion_areas`) — excluding the osm2pgsql middle tables (`planet_osm_ways`, `planet_osm_rels`) that are only needed for replication. Matches the pattern in CTM's `scripts/osm/refresh-osm-template.sh`.
+- **`/mnt/backup/osm-bootstrap/planet-filtered-*.osm.pbf`** is a separate, manually-refreshed (quarterly) artifact used to re-bootstrap full OSM replication if needed.
+
+This gives two distinct restore paths — one fast (app serving traffic), one slower (replication working again). Full discussion in CTM's `docs/backup-and-restore.md`.
+
 ## See also
 - Restore procedures: `RESTORE.md` (in this directory)
+- CTM-specific backup/restore docs (especially OSM): `color-the-map/docs/backup-and-restore.md`
 - Architecture/design docs: Doug's Obsidian vault, "Home Server Backups" folder
 - GitHub issues: [#487](https://github.com/dhughes/color-the-map/issues/487) (this work), [#496](https://github.com/dhughes/color-the-map/issues/496) (GPX encryption — depends on this), [#497](https://github.com/dhughes/color-the-map/issues/497) (NVMe LUKS — depends on this)
