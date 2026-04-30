@@ -18,7 +18,7 @@
 set -euo pipefail
 
 STAGING="${1:-/var/lib/backup-staging}/osm"
-DB=${OSM_DB:-color_the_map}
+DB=${OSM_DB:-color-the-map}
 
 mkdir -p "$STAGING"
 

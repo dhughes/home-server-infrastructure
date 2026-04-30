@@ -87,7 +87,7 @@ A few scripts respect env vars for local testing or one-off overrides:
 | `notify.sh` | `NTFY_TOPIC` | contents of `/root/.ntfy-topic` |
 | `pg-dump-all.sh` | `BACKUP_SKIP_DBS` | `color-the-map-osm-template` |
 | `sqlite-snapshot.sh` | `APPS_ROOT` | `/home/dhughes/apps` |
-| `osm-checkpoint.sh` | `OSM_DB` | `color_the_map` |
+| `osm-checkpoint.sh` | `OSM_DB` | `color-the-map` |
 | `disk-space-check.sh` | `THRESHOLD`, `MOUNT` | `80`, `/mnt/backup` |
 | `last-backup-check.sh` | `TS_FILE`, `THRESHOLD_SECONDS` | `/mnt/backup/last-backup-timestamp`, `129600` |
 

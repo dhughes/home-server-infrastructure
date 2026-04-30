@@ -74,6 +74,20 @@ fail() {
     exit "$EXIT"
 }
 
+# Run a phase command and abort with proper error context on failure.
+# Captures the actual exit code (the `if !` pattern reports 0 incorrectly
+# because the `!` inverts the pipeline status before $? is evaluated).
+# Usage: run_phase "<phase description>" <command> [args...]
+run_phase() {
+    local PHASE="$1"
+    shift
+    "$@"
+    local EXIT=$?
+    if [ $EXIT -ne 0 ]; then
+        fail "$PHASE" "$EXIT"
+    fi
+}
+
 # ----------------------------------------------------------------------------
 # Phase 0: Sentinel check
 # ----------------------------------------------------------------------------
@@ -100,25 +114,19 @@ chmod 0700 "$STAGING"
 # Phase 2: Postgres dumps
 # ----------------------------------------------------------------------------
 log "Phase 2: Postgres dumps"
-if ! "$LIB_DIR/pg-dump-all.sh" "$STAGING"; then
-    fail "Phase 2 (Postgres dumps)" $?
-fi
+run_phase "Phase 2 (Postgres dumps)" "$LIB_DIR/pg-dump-all.sh" "$STAGING"
 
 # ----------------------------------------------------------------------------
 # Phase 3: SQLite snapshots
 # ----------------------------------------------------------------------------
 log "Phase 3: SQLite snapshots"
-if ! "$LIB_DIR/sqlite-snapshot.sh" "$STAGING"; then
-    fail "Phase 3 (SQLite snapshots)" $?
-fi
+run_phase "Phase 3 (SQLite snapshots)" "$LIB_DIR/sqlite-snapshot.sh" "$STAGING"
 
 # ----------------------------------------------------------------------------
 # Phase 4: OSM checkpoint
 # ----------------------------------------------------------------------------
 log "Phase 4: OSM checkpoint"
-if ! "$LIB_DIR/osm-checkpoint.sh" "$STAGING"; then
-    fail "Phase 4 (OSM checkpoint)" $?
-fi
+run_phase "Phase 4 (OSM checkpoint)" "$LIB_DIR/osm-checkpoint.sh" "$STAGING"
 
 # ----------------------------------------------------------------------------
 # Phase 5: System metadata
@@ -135,8 +143,8 @@ ls /etc/cron.d/ > "$STAGING/metadata/cron-d-listing.txt" 2>/dev/null || true
 # Phase 6: Restic backup
 # ----------------------------------------------------------------------------
 log "Phase 6: Restic backup"
-
-if ! restic backup \
+run_phase "Phase 6 (Restic backup)" \
+    restic backup \
     --repo "$RESTIC_REPO" \
     --password-file "$RESTIC_PASS" \
     --tag nightly \
@@ -152,23 +160,20 @@ if ! restic backup \
     /etc/cron.d \
     /etc/logrotate.d \
     /root/backup-disk.key \
-    /home/dhughes/.ssh/authorized_keys; then
-    fail "Phase 6 (Restic backup)" $?
-fi
+    /home/dhughes/.ssh/authorized_keys
 
 # ----------------------------------------------------------------------------
 # Phase 7: Retention
 # ----------------------------------------------------------------------------
 log "Phase 7: Retention (forget + prune)"
-if ! restic forget \
+run_phase "Phase 7 (Retention)" \
+    restic forget \
     --repo "$RESTIC_REPO" \
     --password-file "$RESTIC_PASS" \
     --keep-daily 14 \
     --keep-weekly 8 \
     --keep-monthly 12 \
-    --prune; then
-    fail "Phase 7 (Retention)" $?
-fi
+    --prune
 
 # ----------------------------------------------------------------------------
 # Phase 8: Update on-drive RESTORE notes + timestamp
