@@ -35,6 +35,9 @@ EXCLUDES="$SCRIPT_DIR/exclude-list.txt"
 RESTORE_MD="$SCRIPT_DIR/RESTORE.md"
 LOG_FILE=/var/log/backup/run.log
 
+APP_ROOT="${APP_ROOT:-/home/dhughes/apps}"
+INFRASTRUCTURE_ROOT="${INFRASTRUCTURE_ROOT:-/home/dhughes/infrastructure}"
+
 NOTIFY="$LIB_DIR/notify.sh"
 HC_URL_FILE=/root/.healthchecks-url
 
@@ -152,8 +155,8 @@ run_phase "Phase 6 (Restic backup)" \
     --exclude-file "$EXCLUDES" \
     --exclude-caches \
     "$STAGING" \
-    /home/dhughes/apps \
-    /home/dhughes/infrastructure \
+    "$APP_ROOT" \
+    "$INFRASTRUCTURE_ROOT" \
     /etc/ssh \
     /etc/ddclient.conf \
     /etc/crypttab \
