@@ -4,10 +4,15 @@
 # This script is allowed to run with passwordless sudo (see /etc/sudoers.d/infrastructure)
 #
 # Usage:
-#   ./deploy.sh          - Deploy everything (caddy + all services)
-#   ./deploy.sh caddy    - Deploy only Caddy config
-#   ./deploy.sh auth     - Deploy only doughughes-net service (homepage/auth)
-#   ./deploy.sh services - Deploy all services (not caddy)
+#   ./deploy.sh                       - Deploy everything (caddy + all services)
+#   ./deploy.sh caddy                 - Deploy only Caddy config
+#   ./deploy.sh auth                  - Deploy only doughughes-net service (homepage/auth)
+#   ./deploy.sh services              - Deploy all services (not caddy)
+#   ./deploy.sh service <svc> [<app>] - Install /mnt/data/apps/<app>/<svc>.service into
+#                                       /etc/systemd/system, chmod 644, daemon-reload.
+#                                       <app> defaults to <svc>. Use this from each app's
+#                                       deploy.sh to install its updated unit file via
+#                                       a single sudo'd call (covered by sudoers).
 #
 
 set -e
@@ -37,6 +42,30 @@ deploy_all() {
     deploy_services
 }
 
+deploy_service() {
+    local svc="$1"
+    local app="${2:-$1}"
+
+    if [ -z "$svc" ]; then
+        echo "Usage: $0 service <service-name> [<app-dir>]"
+        echo "  service-name: name of the .service file (without .service extension)"
+        echo "  app-dir: subdirectory under /mnt/data/apps (defaults to <service-name>)"
+        exit 1
+    fi
+
+    local source="/mnt/data/apps/$app/$svc.service"
+    if [ ! -f "$source" ]; then
+        echo "Error: $source not found"
+        exit 1
+    fi
+
+    echo "Installing $svc.service from $source..."
+    cp "$source" "/etc/systemd/system/$svc.service"
+    chmod 644 "/etc/systemd/system/$svc.service"
+    systemctl daemon-reload
+    echo "$svc.service installed and systemd reloaded."
+}
+
 case "${1:-all}" in
     caddy)
         deploy_caddy
@@ -47,12 +76,15 @@ case "${1:-all}" in
     services)
         deploy_services
         ;;
+    service)
+        deploy_service "$2" "$3"
+        ;;
     all)
         deploy_all
         ;;
     *)
         echo "Unknown target: $1"
-        echo "Usage: $0 [caddy|auth|services|all]"
+        echo "Usage: $0 [caddy|auth|services|all|service <svc> [<app>]]"
         exit 1
         ;;
 esac
