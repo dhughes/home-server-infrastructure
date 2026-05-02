@@ -10,6 +10,6 @@ echo "📤 Pushing local changes to git..."
 git push
 
 echo "🔗 Connecting to server and running deployment..."
-ssh ${SERVER_USER}@${SERVER_HOST} 'cd ~/infrastructure && git pull && sudo ./deploy.sh'
+ssh ${SERVER_USER}@${SERVER_HOST} 'cd /mnt/data/infrastructure && git pull && sudo ./deploy.sh'
 
 echo "✅ Production deployment complete!"
