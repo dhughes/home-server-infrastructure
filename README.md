@@ -208,10 +208,26 @@ Allow passwordless restart/status for each app service (needed for app deploy sc
 ```bash
 sudo tee /etc/sudoers.d/app-services > /dev/null <<'EOF'
 # Restart all app services
-dhughes ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart color-the-map, /usr/bin/systemctl restart color-the-map-jobs, /usr/bin/systemctl restart home-inventory, /usr/bin/systemctl restart doughughes-net, /usr/bin/systemctl restart the-game-ultra-deluxe-api, /usr/bin/systemctl restart app-template, /usr/bin/systemctl restart cranium-charades, /usr/bin/systemctl restart lottery-numbers, /usr/bin/systemctl restart random-word
+dhughes ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart color-the-map
+dhughes ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart color-the-map-jobs
+dhughes ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart home-inventory
+dhughes ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart doughughes-net
+dhughes ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart the-game-ultra-deluxe-api
+dhughes ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart app-template
+dhughes ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart cranium-charades
+dhughes ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart lottery-numbers
+dhughes ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart random-word
 
 # Status checks
-dhughes ALL=(ALL) NOPASSWD: /usr/bin/systemctl status color-the-map, /usr/bin/systemctl status color-the-map-jobs, /usr/bin/systemctl status home-inventory, /usr/bin/systemctl status doughughes-net, /usr/bin/systemctl status the-game-ultra-deluxe-api, /usr/bin/systemctl status app-template, /usr/bin/systemctl status cranium-charades, /usr/bin/systemctl status lottery-numbers, /usr/bin/systemctl status random-word
+dhughes ALL=(ALL) NOPASSWD: /usr/bin/systemctl status color-the-map
+dhughes ALL=(ALL) NOPASSWD: /usr/bin/systemctl status color-the-map-jobs
+dhughes ALL=(ALL) NOPASSWD: /usr/bin/systemctl status home-inventory
+dhughes ALL=(ALL) NOPASSWD: /usr/bin/systemctl status doughughes-net
+dhughes ALL=(ALL) NOPASSWD: /usr/bin/systemctl status the-game-ultra-deluxe-api
+dhughes ALL=(ALL) NOPASSWD: /usr/bin/systemctl status app-template
+dhughes ALL=(ALL) NOPASSWD: /usr/bin/systemctl status cranium-charades
+dhughes ALL=(ALL) NOPASSWD: /usr/bin/systemctl status lottery-numbers
+dhughes ALL=(ALL) NOPASSWD: /usr/bin/systemctl status random-word
 
 # CTM-specific: enable jobs unit (idempotent; deploy.sh runs this defensively)
 dhughes ALL=(ALL) NOPASSWD: /usr/bin/systemctl enable color-the-map-jobs
@@ -222,7 +238,7 @@ EOF
 sudo chmod 0440 /etc/sudoers.d/app-services
 ```
 
-**Note:** Sudoers doesn't support wildcards in command arguments, so each service must be listed explicitly. When adding a new app, update this file with the new service name.
+**Note:** One rule per line — sudoers doesn't support wildcards in command arguments, AND comma-chained rules on a single line are vulnerable to terminal line-wrap inserting literal newlines mid-rule (which produces a syntax error in `visudo -c`). When adding a new app, append a new line for each `restart` and `status` command.
 
 Service-file installation (cp into `/etc/systemd/system/` + chmod + daemon-reload) is NOT done via per-app sudoers entries. Each app's `deploy.sh` calls `sudo /mnt/data/infrastructure/deploy.sh service <svc-name> [<app-dir>]` which is covered by the existing `/etc/sudoers.d/infrastructure` entry. This avoids a per-service sudoers entry for each cp/chmod combination.
 
