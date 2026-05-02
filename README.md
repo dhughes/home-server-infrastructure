@@ -197,7 +197,7 @@ Default login: `admin` / `changeme` (change immediately after first login!)
 ### Infrastructure Deploy Script
 
 ```bash
-echo 'dhughes ALL=(ALL) NOPASSWD: /home/dhughes/infrastructure/deploy.sh' | sudo tee /etc/sudoers.d/infrastructure
+echo 'dhughes ALL=(ALL) NOPASSWD: /mnt/data/infrastructure/deploy.sh' | sudo tee /etc/sudoers.d/infrastructure
 sudo chmod 0440 /etc/sudoers.d/infrastructure
 ```
 
